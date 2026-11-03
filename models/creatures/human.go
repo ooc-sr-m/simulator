@@ -1,0 +1,7 @@
+
+
+type Human struct {
+	Creature
+	
+	
+}
