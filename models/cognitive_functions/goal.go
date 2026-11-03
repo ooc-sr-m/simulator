@@ -1,16 +1,20 @@
+package cognitive_functions
+
+import "github.com/google/uuid"
+
 type GoalStatus string
 
 const (
-    GoalActive    GoalStatus = "active"
-    GoalCompleted GoalStatus = "completed"
-    GoalFailed    GoalStatus = "failed"
-    GoalSuspended GoalStatus = "suspended"
+	GoalActive    GoalStatus = "active"
+	GoalCompleted GoalStatus = "completed"
+	GoalFailed    GoalStatus = "failed"
+	GoalSuspended GoalStatus = "suspended"
 )
 
 type Goal struct {
-    ID          uuid.UUID
-    Description string
-    Priority    int
-    Status      GoalStatus
-    Progress    float64
+	ID          uuid.UUID
+	Description string
+	Priority    int
+	Status      GoalStatus
+	Progress    float64
 }

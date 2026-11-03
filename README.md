@@ -23,3 +23,13 @@ Principios de diseño
 - Memoria y consecuencias: los agentes recuerdan acontecimientos pertinentes y sus relaciones evolucionan.
 - Trazabilidad: registrar propuestas del LLM, validaciones, decisiones y cambios de estado para poder auditar la simulación.
 - Modelos intercambiables: poder utilizar un LLM local mediante Ollama o un proveedor remoto como OpenAI.
+
+## Ejecutar
+
+Con Go 1.26 o posterior instalado:
+
+```sh
+go run ./cmd/simulator
+```
+
+El comando muestra `Hola Mundo` mientras se construye el primer bucle de simulación.
