@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080b10">
+  <meta name="description" content="Live world initialization interface for the simulator">
+  <title>Initializing world · Simulator</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="World Forge home">
+        <span class="brand-mark" aria-hidden="true"><span>W</span></span>
+        <span>
+          <strong>WORLD//FORGE</strong>
+          <small>SIMULATION ENGINE</small>
+        </span>
+      </a>
+
+      <div class="instance" aria-label="Current simulation instance">
+        <span class="live-dot" aria-hidden="true"></span>
+        INSTANCE <strong>ALPHA–01</strong>
+      </div>
+
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Use light mode">
+        <span class="theme-icon" aria-hidden="true">◐</span>
+        <span id="theme-label">LIGHT MODE</span>
+      </button>
+    </header>
+
+    <main>
+      <section class="boot-hud" aria-labelledby="page-title">
+        <div class="boot-copy">
+          <p class="kicker"><span>BOOT SEQUENCE</span><span class="kicker-line"></span><span id="boot-state">ACTIVE</span></p>
+          <h1 id="page-title">INITIALIZING WORLD</h1>
+          <p class="phase" id="phase">Preparing ecosystem</p>
+        </div>
+
+        <div class="progress-readout" aria-hidden="true">
+          <span class="progress-number" id="progress-number">000</span><span class="progress-symbol">%</span>
+        </div>
+
+        <div class="progress-block">
+          <div class="progress-meta">
+            <span>WORLD ASSEMBLY</span>
+            <span id="progress-label">0 / — ENTITIES</span>
+          </div>
+          <div class="progress-track" id="progress-track" role="progressbar" aria-label="World initialization progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="progress-fill" id="progress-bar"><span></span></div>
+            <div class="progress-grid" aria-hidden="true"></div>
+          </div>
+          <div class="progress-scale" aria-hidden="true"><span>00</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+        </div>
+
+        <dl class="telemetry" aria-label="World telemetry">
+          <div><dt>SEED</dt><dd>42</dd></div>
+          <div><dt>CREATURES</dt><dd id="creature-count">00</dd></div>
+          <div><dt>SPECIES</dt><dd id="species-count">00</dd></div>
+          <div><dt>STATUS</dt><dd class="pending" id="world-state">LOADING</dd></div>
+        </dl>
+      </section>
+
+      <div class="dashboard-grid">
+        <section class="panel roster-panel" aria-labelledby="roster-title">
+          <header class="panel-header">
+            <div>
+              <p class="panel-index">01 / ENTITY ROSTER</p>
+              <h2 id="roster-title">CREATURES</h2>
+            </div>
+            <p class="panel-note">SELECT AN ENTITY TO INSPECT</p>
+          </header>
+
+          <div class="creature-list" id="creature-list" aria-live="polite">
+            <div class="waiting-state" id="waiting-state">
+              <span class="waiting-glyph" aria-hidden="true"></span>
+              <strong>AWAITING ENTITIES</strong>
+              <small>The roster will populate as Go initializes each creature.</small>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel console-panel" aria-labelledby="console-title">
+          <header class="panel-header">
+            <div>
+              <p class="panel-index">02 / ENGINE OUTPUT</p>
+              <h2 id="console-title">SYSTEM LOG</h2>
+            </div>
+            <div class="console-actions">
+              <span class="stream-state"><span class="live-dot" aria-hidden="true"></span> LIVE</span>
+              <button class="text-button" id="clear-log" type="button">CLEAR</button>
+            </div>
+          </header>
+
+          <div class="console" id="system-log" role="log" aria-live="polite" aria-relevant="additions">
+            <div class="console-line local-line">
+              <time>--:--:--.---</time><span class="log-level level-info">CLIENT</span><span class="log-scope">UI</span><p>Connecting to Go simulation engine…</p>
+            </div>
+          </div>
+          <footer class="console-footer"><span>STREAM /api/world/initialize</span><span id="event-count">000 EVENTS</span></footer>
+        </section>
+      </div>
+    </main>
+
+    <footer class="app-footer">
+      <span>WORLD//FORGE RUNTIME</span>
+      <span>LOCAL CONNECTION · SSE</span>
+    </footer>
+  </div>
+
+  <template id="creature-template">
+    <details class="creature-card">
+      <summary>
+        <span class="entity-number"></span>
+        <span class="entity-avatar" aria-hidden="true"></span>
+        <span class="entity-heading"><strong class="entity-name"></strong><small class="entity-variant"></small></span>
+        <span class="species-tag"></span>
+        <span class="entity-ready"><i aria-hidden="true"></i> READY</span>
+        <span class="expand-icon" aria-hidden="true">＋</span>
+      </summary>
+      <div class="entity-details">
+        <div class="identity-strip">
+          <span>ENTITY UUID</span>
+          <code class="entity-id"></code>
+        </div>
+        <div class="stat-grid">
+          <div class="stat"><span>AGE</span><strong class="entity-age"></strong><small>cycles</small></div>
+          <div class="stat"><span>HUNGER CAP</span><strong class="hunger-max"></strong><small>units</small></div>
+          <div class="stat"><span>HUNGER RATE</span><strong class="hunger-rate"></strong><small>per tick</small></div>
+        </div>
+        <div class="capability-block">
+          <span class="detail-label">CAPABILITY MATRIX</span>
+          <div class="capability-list"></div>
+        </div>
+      </div>
+    </details>
+  </template>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

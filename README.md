@@ -33,3 +33,13 @@ go run ./cmd/simulator
 ```
 
 El comando inicializa `WorldService`, crea diez perros con genomas aleatorios dentro de los rangos definidos para la especie y muestra sus datos y capacidades en la consola.
+
+### Entrypoint gráfico
+
+El simulador también dispone de un arranque visual independiente:
+
+```powershell
+go run ./cmd/simulator-gui
+```
+
+Este comando abre una interfaz local en el navegador con el progreso de carga del mundo y un registro en tiempo real de las criaturas inicializadas. El entrypoint de consola continúa disponible sin cambios.
