@@ -32,7 +32,7 @@ Con Go 1.26 o posterior instalado, ejecuta desde la raíz del proyecto:
 go run ./cmd/simulator
 ```
 
-El comando inicializa `WorldService`, crea diez perros con genomas aleatorios dentro de los rangos definidos para la especie y muestra sus datos y capacidades en la consola.
+El comando inicializa `WorldService`, crea diez perros con genomas aleatorios dentro de los rangos definidos para la especie y muestra sus datos y capacidades en la consola. Cuando el mundo está listo, solicita confirmación antes de iniciar la simulación. Al aceptar, crea un servicio independiente y una goroutine por perro. Cada servicio actualiza su perro inmediatamente y vuelve a hacerlo cada segundo hasta que la simulación se detiene con `Ctrl+C`.
 
 ### Entrypoint gráfico
 

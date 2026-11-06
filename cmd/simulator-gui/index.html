@@ -32,6 +32,7 @@
     </header>
 
     <main>
+      <section class="screen" id="boot-screen" aria-labelledby="page-title">
       <section class="boot-hud" aria-labelledby="page-title">
         <div class="boot-copy">
           <p class="kicker"><span>BOOT SEQUENCE</span><span class="kicker-line"></span><span id="boot-state">ACTIVE</span></p>
@@ -102,6 +103,106 @@
           <footer class="console-footer"><span>STREAM /api/world/initialize</span><span id="event-count">000 EVENTS</span></footer>
         </section>
       </div>
+
+      <section class="launch-panel" id="launch-panel" hidden aria-labelledby="launch-title">
+        <div>
+          <p class="panel-index">03 / OPERATOR CONFIRMATION</p>
+          <h2 id="launch-title">WORLD ASSEMBLY COMPLETE</h2>
+          <p>The creatures are ready. Start the simulation to activate one autonomous goroutine per entity.</p>
+        </div>
+        <button class="launch-button" id="start-world" type="button" disabled>
+          <span>START WORLD</span>
+          <small>BEGIN LIVE SIMULATION →</small>
+        </button>
+      </section>
+      </section>
+
+      <section class="screen runtime-screen" id="world-screen" hidden aria-labelledby="runtime-title">
+        <header class="runtime-hero">
+          <div>
+            <p class="kicker"><span>LIVE SIMULATION</span><span class="kicker-line"></span><span>RUNNING</span></p>
+            <h1 id="runtime-title">WORLD ONLINE</h1>
+            <p class="phase">Select a creature to inspect its state and live activity.</p>
+          </div>
+          <div class="runtime-status" aria-label="Simulation status">
+            <span class="live-dot" aria-hidden="true"></span>
+            <strong>ACTIVE</strong>
+            <small>1 SECOND TICK</small>
+          </div>
+        </header>
+
+        <div class="runtime-layout">
+          <aside class="panel runtime-roster-panel" aria-labelledby="runtime-roster-title">
+            <header class="panel-header">
+              <div>
+                <p class="panel-index">01 / ACTIVE ENTITIES</p>
+                <h2 id="runtime-roster-title">CREATURES</h2>
+              </div>
+              <span class="entity-total" id="runtime-creature-count">00</span>
+            </header>
+            <div class="runtime-creature-list" id="runtime-creature-list" role="listbox" aria-label="Active creatures"></div>
+          </aside>
+
+          <section class="panel inspector-panel" aria-labelledby="inspector-title">
+            <header class="panel-header">
+              <div>
+                <p class="panel-index">02 / ENTITY INSPECTOR</p>
+                <h2 id="inspector-title">CREATURE DETAILS</h2>
+              </div>
+              <span class="species-tag" id="selected-species">—</span>
+            </header>
+
+            <div class="inspector-content" id="inspector-content">
+              <div class="inspector-identity">
+                <span class="inspector-avatar" id="selected-avatar" aria-hidden="true">?</span>
+                <div>
+                  <p>SELECTED ENTITY</p>
+                  <h3 id="selected-name">No creature selected</h3>
+                  <span id="selected-variant">—</span>
+                </div>
+              </div>
+
+              <div class="identity-strip inspector-uuid">
+                <span>ENTITY UUID</span>
+                <code id="selected-id">—</code>
+              </div>
+
+              <div class="stat-grid inspector-stats">
+                <div class="stat"><span>AGE</span><strong id="selected-age">—</strong><small>cycles</small></div>
+                <div class="stat"><span>HUNGER CAP</span><strong id="selected-hunger-max">—</strong><small>units</small></div>
+                <div class="stat"><span>HUNGER RATE</span><strong id="selected-hunger-rate">—</strong><small>per tick</small></div>
+              </div>
+
+              <div class="capability-block">
+                <span class="detail-label">CAPABILITY MATRIX</span>
+                <div class="capability-list" id="selected-capabilities"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel console-panel runtime-console-panel" aria-labelledby="creature-console-title">
+            <header class="panel-header">
+              <div>
+                <p class="panel-index">03 / CREATURE OUTPUT</p>
+                <h2 id="creature-console-title">LIVE LOG · <span id="log-creature-name">—</span></h2>
+              </div>
+              <div class="console-actions">
+                <span class="stream-state"><span class="live-dot" aria-hidden="true"></span> LIVE</span>
+                <button class="text-button" id="clear-creature-log" type="button">CLEAR</button>
+              </div>
+            </header>
+
+            <div class="console creature-console" id="creature-log" role="log" aria-live="polite" aria-relevant="additions">
+              <div class="console-empty" id="creature-log-empty">
+                <span aria-hidden="true">⌁</span>
+                <strong>WAITING FOR CREATURE ACTIVITY</strong>
+                <small>Updates will arrive once the selected entity completes its next tick.</small>
+              </div>
+            </div>
+            <footer class="console-footer"><span>STREAM /api/world/logs</span><span id="creature-event-count">000 EVENTS</span></footer>
+          </section>
+        </div>
+      </section>
     </main>
 
     <footer class="app-footer">

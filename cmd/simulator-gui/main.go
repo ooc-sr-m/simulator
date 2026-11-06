@@ -30,7 +30,8 @@ type guiConfig struct {
 }
 
 type completionEvent struct {
-	Count int `json:"count"`
+	Count   int  `json:"count"`
+	Running bool `json:"running"`
 }
 
 type statusEvent struct {
@@ -75,11 +76,15 @@ func main() {
 }
 
 func newHandler(config guiConfig) http.Handler {
+	runtime := newSimulationRuntime()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", serveAsset("index.html", "text/html; charset=utf-8"))
+	mux.HandleFunc("GET /world", serveAsset("index.html", "text/html; charset=utf-8"))
 	mux.HandleFunc("GET /styles.css", serveAsset("styles.css", "text/css; charset=utf-8"))
 	mux.HandleFunc("GET /app.js", serveAsset("app.js", "text/javascript; charset=utf-8"))
-	mux.HandleFunc("GET /api/world/initialize", initializationHandler(config))
+	mux.HandleFunc("GET /api/world/initialize", initializationHandler(config, runtime))
+	mux.HandleFunc("POST /api/world/start", runtime.startHandler)
+	mux.HandleFunc("GET /api/world/logs", runtime.logsHandler)
 	return mux
 }
 
@@ -96,7 +101,7 @@ func serveAsset(name string, contentType string) http.HandlerFunc {
 	}
 }
 
-func initializationHandler(config guiConfig) http.HandlerFunc {
+func initializationHandler(config guiConfig, runtime *simulationRuntime) http.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request) {
 		flusher, ok := response.(http.Flusher)
 		if !ok {
@@ -108,6 +113,23 @@ func initializationHandler(config guiConfig) http.HandlerFunc {
 		response.Header().Set("Cache-Control", "no-cache")
 		response.Header().Set("Connection", "keep-alive")
 		response.Header().Set("X-Content-Type-Options", "nosniff")
+
+		if existingCreatures, running := runtime.worldSnapshot(); len(existingCreatures) > 0 {
+			status := "World ready to start"
+			if running {
+				status = "World simulation online"
+			}
+			if err := writeEvent(response, flusher, "status", statusEvent{Message: status}); err != nil {
+				return
+			}
+			for _, event := range existingCreatures {
+				if err := writeEvent(response, flusher, "creature", event); err != nil {
+					return
+				}
+			}
+			_ = writeEvent(response, flusher, "complete", completionEvent{Count: len(existingCreatures), Running: running})
+			return
+		}
 
 		if err := writeEvent(response, flusher, "status", statusEvent{Message: "Preparing ecosystem"}); err != nil {
 			return
@@ -121,10 +143,12 @@ func initializationHandler(config guiConfig) http.HandlerFunc {
 
 		worldService := config.newWorld()
 		var streamErr error
+		creatureEvents := make([]services.CreatureInitializationEvent, 0)
 		createdCreatures, err := worldService.CreateCreaturesWithObserver(func(event services.CreatureInitializationEvent) {
 			if streamErr != nil {
 				return
 			}
+			creatureEvents = append(creatureEvents, event)
 			streamErr = writeEvent(response, flusher, "creature", event)
 			if streamErr == nil {
 				streamErr = writeEvent(response, flusher, "log", newLogEvent(
@@ -144,6 +168,7 @@ func initializationHandler(config guiConfig) http.HandlerFunc {
 			_ = writeEvent(response, flusher, "world-error", statusEvent{Message: err.Error()})
 			return
 		}
+		runtime.setWorld(createdCreatures, creatureEvents)
 
 		if err := writeEvent(response, flusher, "log", newLogEvent("READY", "WORLD", fmt.Sprintf("World online · %d creatures active", len(createdCreatures)))); err != nil {
 			return
