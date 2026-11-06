@@ -9,12 +9,16 @@ import (
 )
 
 type Creature struct {
-	ID       uuid.UUID
-	Species  string
-	Age      int
-	Location uuid.UUID
-	Position worldmap.Position
+	ID           uuid.UUID
+	Species      string
+	Genome       *Genome
+	Capabilities CapabilitySet
+	Age          int
+	Location     uuid.UUID
+	Position     worldmap.Position
 
+	Body       *physiological_capacities.Body
+	Energy     *physiological_capacities.Energy
 	Senses     *physiological_capacities.Senses
 	Metabolism *physiological_capacities.Metabolism
 	Mobility   *physiological_capacities.Mobility

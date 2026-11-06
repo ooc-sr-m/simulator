@@ -24,12 +24,12 @@ Principios de diseño
 - Trazabilidad: registrar propuestas del LLM, validaciones, decisiones y cambios de estado para poder auditar la simulación.
 - Modelos intercambiables: poder utilizar un LLM local mediante Ollama o un proveedor remoto como OpenAI.
 
-## Ejecutar
+## Ejecutar el simulador
 
-Con Go 1.26 o posterior instalado:
+Con Go 1.26 o posterior instalado, ejecuta desde la raíz del proyecto:
 
-```sh
+```powershell
 go run ./cmd/simulator
 ```
 
-El comando muestra `Hola Mundo` mientras se construye el primer bucle de simulación.
+El comando inicializa `WorldService`, crea diez perros con genomas aleatorios dentro de los rangos definidos para la especie y muestra sus datos y capacidades en la consola.

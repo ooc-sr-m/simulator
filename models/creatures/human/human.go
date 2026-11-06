@@ -1,13 +1,18 @@
-package creatures
+package human
 
-import "simulator/models/cognitive_functions"
+import (
+	"github.com/google/uuid"
+
+	"simulator/models/cognitive_functions"
+	"simulator/models/creatures"
+)
 
 type Human struct {
-	Creature
+	creatures.Creature
 
-	Name		*string
-	Father		*uuid.UUID
-	Mother 		*uuid.UUID
+	Name        *string
+	Father      *uuid.UUID
+	Mother      *uuid.UUID
 	Personality cognitive_functions.Personality
 	Reasoning   cognitive_functions.Reasoning
 	Goals       []cognitive_functions.Goal
