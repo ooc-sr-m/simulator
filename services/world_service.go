@@ -10,7 +10,7 @@ import (
 	"simulator/models/capabilities"
 	"simulator/models/creatures"
 	"simulator/models/creatures/dog"
-	"simulator/models/map"
+	worldmap "simulator/models/map"
 	"simulator/models/physiological_capacities"
 )
 
@@ -87,7 +87,7 @@ func (service *WorldService) CreateDog(name string, breed string) (*dog.Dog, err
 			Capabilities: capabilities,
 			Age:          0,
 			Location:     uuid.New(),
-			Position:     map.Position{X: 0, Y: 0},
+			Position:     worldmap.Position{X: 0, Y: 0},
 			Body: &physiological_capacities.Body{
 				Height: 1.0,
 				Weight: 10.0,
