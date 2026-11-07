@@ -15,8 +15,8 @@ import (
 	"syscall"
 
 	"simulator/helper"
-	"simulator/services"
 	creatureservices "simulator/services/creatures"
+	"simulator/services"
 )
 
 func main() {
