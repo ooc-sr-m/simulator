@@ -8,13 +8,15 @@ import (
 
 	"simulator/helper"
 	"simulator/models/creatures/dog"
+	"simulator/services"
 )
 
 // DogService owns the business logic and state updates for one dog.
 // A different instance must be created for every dog in the world.
 type DogService struct {
-	dog    *dog.Dog
-	logger helper.GroupLogger
+	dog            *dog.Dog
+	logger         helper.GroupLogger
+	metabolismSvc  *services.MetabolismService
 }
 
 const dogUpdateInterval = time.Second
@@ -30,9 +32,15 @@ func NewDogService(createdDog *dog.Dog, logger helper.GroupLogger) (*DogService,
 		return nil, fmt.Errorf("dog logger is not initialized")
 	}
 
+	metabolismSvc, err := services.NewMetabolismService(createdDog.Creature.Metabolism)
+	if err != nil {
+		return nil, fmt.Errorf("create metabolism service: %w", err)
+	}
+
 	return &DogService{
-		dog:    createdDog,
-		logger: logger,
+		dog:            createdDog,
+		logger:         logger,
+		metabolismSvc:  metabolismSvc,
 	}, nil
 }
 
@@ -46,9 +54,15 @@ func (service *DogService) Update() error {
 		return fmt.Errorf("dog name is empty")
 	}
 
+	if err := service.metabolismSvc.Update(); err != nil {
+		return fmt.Errorf("update metabolism: %w", err)
+	}
+
 	name := strings.TrimSpace(*service.dog.Name)
+	hunger, thirst := service.metabolismSvc.GetCurrentState()
 	group := fmt.Sprintf("perro %s · %s", name, service.dog.Creature.ID)
-	message := fmt.Sprintf("hola mundo, soy el perro %s", name)
+	message := fmt.Sprintf("hola mundo, soy el perro %s | hambre: %d/%d | sed: %d/%d", 
+		name, hunger, service.dog.Creature.Metabolism.HungerMax, thirst, service.dog.Creature.Metabolism.ThirstMax)
 
 	if err := service.logger.Log(group, message); err != nil {
 		return fmt.Errorf("update dog %s: %w", name, err)
