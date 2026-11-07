@@ -62,7 +62,10 @@ func (service *WorldService) CreateDog(name string, breed string) (*dog.Dog, err
 			Genome:       &genome,
 			Capabilities: cloneCapabilities(genome.Labels),
 			Metabolism: &physiological_capacities.Metabolism{
+				Hunger:     genome.HungerMax,
+				Thirst:     genome.ThirstMax,
 				HungerRate: genome.HungerRate,
+				ThirstRate: genome.ThirstRate,
 			},
 		},
 		Breed: breed,
