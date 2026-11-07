@@ -1,6 +1,8 @@
 package services
 
 import (
+	"fmt"
+
 	"simulator/models/creatures"
 )
 
