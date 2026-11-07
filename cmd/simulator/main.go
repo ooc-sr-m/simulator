@@ -42,7 +42,7 @@ func main() {
 		fmt.Printf("ID: %s\n", createdDog.Creature.ID)
 		fmt.Printf("Species: %s\n", createdDog.Creature.Species)
 		fmt.Printf("Hunger maximum: %d\n", createdDog.Creature.Genome.HungerMax)
-		fmt.Printf("Hunger rate: %.4f\n", createdDog.Creature.Metabolism.HungerRate)
+		fmt.Printf("Hunger rate: %.4f\n", createdDog.Creature.Genome.HungerRate)
 		fmt.Printf("Capabilities: %v\n", capabilities)
 	}
 
