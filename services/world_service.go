@@ -10,6 +10,7 @@ import (
 	"simulator/models/capabilities"
 	"simulator/models/creatures"
 	"simulator/models/creatures/dog"
+	"simulator/models/map"
 	"simulator/models/physiological_capacities"
 )
 
@@ -66,6 +67,11 @@ func (service *WorldService) CreateDog(name string, breed string) (*dog.Dog, err
 	profile := dog.GenomeProfile()
 	capabilities := cloneCapabilities(profile.Labels)
 
+	hungerMax := profile.HungerMax.Min + service.nameRandom.Intn(profile.HungerMax.Max-profile.HungerMax.Min+1)
+	hungerRate := profile.HungerRate.Min + service.nameRandom.Float64()*(profile.HungerRate.Max-profile.HungerRate.Min)
+	thirstMax := profile.ThirstMax.Min + service.nameRandom.Intn(profile.ThirstMax.Max-profile.ThirstMax.Min+1)
+	thirstRate := profile.ThirstRate.Min + service.nameRandom.Float64()*(profile.ThirstRate.Max-profile.ThirstRate.Min)
+
 	createdDog := &dog.Dog{
 		Creature: creatures.Creature{
 			ID:           uuid.New(),
@@ -73,15 +79,15 @@ func (service *WorldService) CreateDog(name string, breed string) (*dog.Dog, err
 			Genome: &creatures.Genome{
 				SpeciesID:  profile.ID,
 				Labels:     capabilities,
-				HungerMax:  profile.HungerMax.Min + service.nameRandom.Intn(profile.HungerMax.Max-profile.HungerMin.Min),
-				HungerRate: profile.HungerRate.Min + service.nameRandom.Float64()*(profile.HungerRate.Max-profile.HungerRate.Min),
-				ThirstMax:  profile.ThirstMax.Min + service.nameRandom.Intn(profile.ThirstMax.Max-profile.ThirstMax.Min),
-				ThirstRate: profile.ThirstRate.Min + service.nameRandom.Float64()*(profile.ThirstRate.Max-profile.ThirstRate.Min),
+				HungerMax:  hungerMax,
+				HungerRate: hungerRate,
+				ThirstMax:  thirstMax,
+				ThirstRate: thirstRate,
 			},
 			Capabilities: capabilities,
 			Age:          0,
 			Location:     uuid.New(),
-			Position:     creatures.Position{X: 0, Y: 0},
+			Position:     map.Position{X: 0, Y: 0},
 			Body: &physiological_capacities.Body{
 				Height: 1.0,
 				Weight: 10.0,
