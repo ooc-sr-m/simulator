@@ -3,6 +3,7 @@ package creatures
 import (
 	"github.com/google/uuid"
 
+	"simulator/models/capabilities"
 	"simulator/models/cognitive_functions"
 	worldmap "simulator/models/map"
 	"simulator/models/physiological_capacities"

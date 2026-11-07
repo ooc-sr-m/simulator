@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"simulator/helper"
+	"simulator/models/capabilities"
+	"simulator/models/creatures"
 	"simulator/models/creatures/dog"
 	"simulator/services"
 )
@@ -32,20 +34,16 @@ func NewDogService(createdDog *dog.Dog, logger helper.GroupLogger) (*DogService,
 		return nil, fmt.Errorf("dog logger is not initialized")
 	}
 
-	metabolismSvc, err := services.NewMetabolismService(createdDog.Creature.Metabolism)
-	if err != nil {
-		return nil, fmt.Errorf("create metabolism service: %w", err)
-	}
+	metabolismSvc := services.NewMetabolismService(createdDog.Creature.Genome)
 
 	return &DogService{
-		dog:            createdDog,
-		logger:         logger,
-		metabolismSvc:  metabolismSvc,
+		dog:           createdDog,
+		logger:        logger,
+		metabolismSvc: metabolismSvc,
 	}, nil
 }
 
 // Update advances this dog's state by one simulation step.
-// It only logs a greeting for now; future dog-specific rules belong here.
 func (service *DogService) Update() error {
 	if service == nil || service.dog == nil || service.logger == nil {
 		return fmt.Errorf("dog service is not initialized")
@@ -62,7 +60,7 @@ func (service *DogService) Update() error {
 	hunger, thirst := service.metabolismSvc.GetCurrentState()
 	group := fmt.Sprintf("perro %s · %s", name, service.dog.Creature.ID)
 	message := fmt.Sprintf("hola mundo, soy el perro %s | hambre: %d/%d | sed: %d/%d", 
-		name, hunger, service.dog.Creature.Metabolism.HungerMax, thirst, service.dog.Creature.Metabolism.ThirstMax)
+		name, hunger, service.metabolismSvc.GetMaxHunger(), thirst, service.metabolismSvc.GetMaxThirst())
 
 	if err := service.logger.Log(group, message); err != nil {
 		return fmt.Errorf("update dog %s: %w", name, err)
