@@ -4,13 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
+	"simulator/helper"
+	creatureservices "simulator/services/creatures"
 	"simulator/models/creatures/dog"
 	"simulator/services"
-	creatureservices "simulator/services/creatures"
 )
 
 const (
@@ -71,45 +74,44 @@ func (runtime *simulationRuntime) start() (bool, error) {
 	}
 
 	dogs := append([]*dog.Dog(nil), runtime.dogs...)
-	dogServices := make([]*creatureservices.DogService, 0, len(dogs))
-	for _, createdDog := range dogs {
-		name := "Unnamed dog"
-		if createdDog.Name != nil {
-			name = *createdDog.Name
-		}
-		logger := creatureEventLogger{
-			runtime:      runtime,
-			creatureID:   createdDog.Creature.ID.String(),
-			creatureName: name,
-		}
-		dogService, err := creatureservices.NewDogService(createdDog, logger)
-		if err != nil {
-			runtime.mutex.Unlock()
-			return false, fmt.Errorf("create dog service: %w", err)
-		}
-		dogServices = append(dogServices, dogService)
-	}
 	runtime.running = true
 	runtime.mutex.Unlock()
 
-	for index, dogService := range dogServices {
-		createdDog := dogs[index]
-		go func(service *creatureservices.DogService, currentDog *dog.Dog) {
-			if err := service.Run(context.Background()); err != nil {
-				name := "Unnamed dog"
-				if currentDog.Name != nil {
-					name = *currentDog.Name
-				}
+	for _, createdDog := range dogs {
+		go func(dog *dog.Dog) {
+			logger := creatureEventLogger{
+				runtime:      runtime,
+				creatureID:   dog.Creature.ID.String(),
+				creatureName: "Unnamed dog",
+			}
+			if dog.Name != nil {
+				logger.creatureName = *dog.Name
+			}
+
+			dogService, err := creatureservices.NewDogService(dog, logger)
+			if err != nil {
 				runtime.publish(creatureLogEvent{
 					Time:         time.Now().Format("15:04:05.000"),
 					Level:        "ERROR",
-					CreatureID:   currentDog.Creature.ID.String(),
-					CreatureName: name,
+					CreatureID:   dog.Creature.ID.String(),
+					CreatureName: logger.creatureName,
+					Scope:        "DOG SERVICE",
+					Message:      fmt.Sprintf("create service: %v", err),
+				})
+				return
+			}
+
+			if err := dogService.Run(context.Background()); err != nil {
+				runtime.publish(creatureLogEvent{
+					Time:         time.Now().Format("15:04:05.000"),
+					Level:        "ERROR",
+					CreatureID:   dog.Creature.ID.String(),
+					CreatureName: logger.creatureName,
 					Scope:        "DOG SERVICE",
 					Message:      err.Error(),
 				})
 			}
-		}(dogService, createdDog)
+		}(createdDog)
 	}
 
 	return true, nil
@@ -142,8 +144,9 @@ func (runtime *simulationRuntime) subscribe() (<-chan creatureLogEvent, []creatu
 
 	unsubscribe := func() {
 		runtime.mutex.Lock()
-		defer runtime.mutex.Unlock()
 		delete(runtime.subscribers, updates)
+		runtime.mutex.Unlock()
+		close(updates)
 	}
 
 	return updates, history, unsubscribe
@@ -159,9 +162,8 @@ func (runtime *simulationRuntime) startHandler(response http.ResponseWriter, req
 	response.Header().Set("Content-Type", "application/json")
 	response.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(response).Encode(struct {
-		Running bool `json:"running"`
 		Started bool `json:"started"`
-	}{Running: true, Started: started})
+	}{Started: started})
 }
 
 func (runtime *simulationRuntime) logsHandler(response http.ResponseWriter, request *http.Request) {
@@ -176,7 +178,7 @@ func (runtime *simulationRuntime) logsHandler(response http.ResponseWriter, requ
 	response.Header().Set("Connection", "keep-alive")
 	response.Header().Set("X-Content-Type-Options", "nosniff")
 
-	updates, history, unsubscribe := runtime.subscribe()
+	subscriber, history, unsubscribe := runtime.subscribe()
 	defer unsubscribe()
 
 	for _, event := range history {
@@ -185,22 +187,9 @@ func (runtime *simulationRuntime) logsHandler(response http.ResponseWriter, requ
 		}
 	}
 
-	heartbeat := time.NewTicker(15 * time.Second)
-	defer heartbeat.Stop()
-
-	for {
-		select {
-		case <-request.Context().Done():
+	for event := range subscriber {
+		if err := writeEvent(response, flusher, "creature-log", event); err != nil {
 			return
-		case event := <-updates:
-			if err := writeEvent(response, flusher, "creature-log", event); err != nil {
-				return
-			}
-		case <-heartbeat.C:
-			if _, err := fmt.Fprint(response, ": keep-alive\n\n"); err != nil {
-				return
-			}
-			flusher.Flush()
 		}
 	}
 }
@@ -215,33 +204,46 @@ func (logger creatureEventLogger) Log(group string, messages ...string) error {
 	if logger.runtime == nil {
 		return fmt.Errorf("simulation runtime is not initialized")
 	}
-	_ = group
 
 	for _, message := range messages {
-		runtime := logger.runtime
 		hunger, thirst := 0, 0
 		
-		runtime.mutex.Lock()
-		for _, dog := range runtime.dogs {
-			if dog.Creature.ID.String() == logger.creatureID {
-				hunger = dog.Creature.Metabolism.Hunger
-				thirst = dog.Creature.Metabolism.Thirst
-				break
+		// Parse hunger and thirst from the message format: "hambre: X/Y | sed: A/B"
+		if idx := strings.Index(message, "hambre:"); idx >= 0 {
+			parts := strings.Split(message[idx:], "|")
+			for _, part := range parts {
+				part = strings.TrimSpace(part)
+				if strings.HasPrefix(part, "hambre:") {
+					fmt.Sscanf(strings.TrimPrefix(part, "hambre:"), "%d/%d", &hunger, &thirst)
+				} else if strings.HasPrefix(part, "sed:") {
+					fmt.Sscanf(strings.TrimPrefix(part, "sed:"), "%d/%d", &thirst, &hunger)
+				}
 			}
 		}
-		runtime.mutex.Unlock()
 
 		logger.runtime.publish(creatureLogEvent{
 			Time:         time.Now().Format("15:04:05.000"),
 			Level:        "INFO",
 			CreatureID:   logger.creatureID,
 			CreatureName: logger.creatureName,
-			Scope:        "DOG",
+			Scope:        group,
 			Message:      message,
 			Hunger:       hunger,
 			Thirst:       thirst,
 		})
 	}
 
+	return nil
+}
+
+func writeEvent(destination io.Writer, flusher http.Flusher, eventName string, payload any) error {
+	encodedPayload, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("encode %s event: %w", eventName, err)
+	}
+	if _, err := fmt.Fprintf(destination, "event: %s\ndata: %s\n\n", eventName, encodedPayload); err != nil {
+		return fmt.Errorf("write %s event: %w", eventName, err)
+	}
+	flusher.Flush()
 	return nil
 }
