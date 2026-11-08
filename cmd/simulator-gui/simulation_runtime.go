@@ -25,6 +25,8 @@ type creatureLogEvent struct {
 	CreatureName string `json:"creature_name"`
 	Scope        string `json:"scope"`
 	Message      string `json:"message"`
+	Hunger       int    `json:"hunger,omitempty"`
+	Thirst       int    `json:"thirst,omitempty"`
 }
 
 type simulationRuntime struct {
@@ -216,6 +218,19 @@ func (logger creatureEventLogger) Log(group string, messages ...string) error {
 	_ = group
 
 	for _, message := range messages {
+		runtime := logger.runtime
+		hunger, thirst := 0, 0
+		
+		runtime.mutex.Lock()
+		for _, dog := range runtime.dogs {
+			if dog.Creature.ID.String() == logger.creatureID {
+				hunger = dog.Creature.Metabolism.Hunger
+				thirst = dog.Creature.Metabolism.Thirst
+				break
+			}
+		}
+		runtime.mutex.Unlock()
+
 		logger.runtime.publish(creatureLogEvent{
 			Time:         time.Now().Format("15:04:05.000"),
 			Level:        "INFO",
@@ -223,6 +238,8 @@ func (logger creatureEventLogger) Log(group string, messages ...string) error {
 			CreatureName: logger.creatureName,
 			Scope:        "DOG",
 			Message:      message,
+			Hunger:       hunger,
+			Thirst:       thirst,
 		})
 	}
 
