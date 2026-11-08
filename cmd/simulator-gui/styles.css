@@ -706,16 +706,25 @@ h1 {
 .console-empty small { max-width: 22rem; margin-top: 0.6rem; color: #62717b; font-size: 0.67rem; line-height: 1.5; }
 
 /* Estilos para barras de estado de metabolismo */
-.status-bar {
+.metabolic-status {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--panel-alt);
+  border-left: 2px solid var(--line-strong);
+}
+
+.metabolic-status-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
   margin-bottom: 0.75rem;
 }
 
-.status-bar span {
-  display: block;
-  font-size: 0.875rem;
+.metabolic-status-bar span {
+  font-size: 0.62rem;
   color: var(--muted);
-  margin-bottom: 0.25rem;
   font-family: "Cascadia Code", Consolas, monospace;
+  letter-spacing: 0.08em;
 }
 
 .progress-bar {
