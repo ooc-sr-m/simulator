@@ -39,11 +39,21 @@ type simulationRuntime struct {
 	history     []creatureLogEvent
 	subscribers map[chan creatureLogEvent]struct{}
 	worldService *services.WorldService
+	// Map para rastrear el estado metabólico actual por criatura
+	metabolismState map[string]*metabolismStatus
+}
+
+type metabolismStatus struct {
+	Hunger    int
+	MaxHunger int
+	Thirst    int
+	MaxThirst int
 }
 
 func newSimulationRuntime() *simulationRuntime {
 	return &simulationRuntime{
-		subscribers: make(map[chan creatureLogEvent]struct{}),
+		subscribers:     make(map[chan creatureLogEvent]struct{}),
+		metabolismState: make(map[string]*metabolismStatus),
 	}
 }
 
@@ -53,6 +63,18 @@ func (runtime *simulationRuntime) setWorld(dogs []*dog.Dog, creatures []services
 
 	runtime.dogs = append([]*dog.Dog(nil), dogs...)
 	runtime.creatures = append([]services.CreatureInitializationEvent(nil), creatures...)
+	
+	// Inicializar el estado metabólico para cada criatura
+	for _, dog := range dogs {
+		if dog.Name != nil && *dog.Name != "" {
+			runtime.metabolismState[dog.Creature.ID.String()] = &metabolismStatus{
+				Hunger:    50, // Valor inicial razonable
+				MaxHunger: 100, // Se actualizará con el valor real del genome
+				Thirst:    50,
+				MaxThirst: 100,
+			}
+		}
+	}
 }
 
 func (runtime *simulationRuntime) worldSnapshot() ([]services.CreatureInitializationEvent, bool) {
@@ -200,31 +222,46 @@ func (runtime *simulationRuntime) getCreatureStatus(creatureID string) (*service
 
 	for _, dog := range runtime.dogs {
 		if dog.Creature.ID.String() == creatureID {
-			// Obtener el servicio de metabolismo para esta criatura específica
-			hunger, thirst := 0, 0
-			
-			// Buscar en los eventos de log recientes para obtener valores actualizados
-			for _, event := range runtime.history {
-				if event.CreatureID == creatureID && event.Hunger > 0 || event.Thirst > 0 {
-					hunger = event.Hunger
-					thirst = event.Thirst
-					break
+			// Obtener el estado metabólico actual para esta criatura
+			state, exists := runtime.metabolismState[creatureID]
+			if !exists {
+				// Si no existe, crear uno con valores por defecto
+				state = &metabolismStatus{
+					Hunger:    50,
+					MaxHunger: 100,
+					Thirst:    50,
+					MaxThirst: 100,
 				}
+				runtime.metabolismState[creatureID] = state
 			}
 
 			return &services.CreatureStatus{
 				ID:        dog.Creature.ID.String(),
 				Name:      *dog.Name,
 				Species:   dog.Creature.Species,
-				Hunger:    hunger,
-				MaxHunger: 100, // Valor por defecto si no se puede obtener
-				Thirst:    thirst,
-				MaxThirst: 100, // Valor por defecto si no se puede obtener
+				Hunger:    state.Hunger,
+				MaxHunger: state.MaxHunger,
+				Thirst:    state.Thirst,
+				MaxThirst: state.MaxThirst,
 			}, nil
 		}
 	}
 
 	return nil, fmt.Errorf("creature not found")
+}
+
+// UpdateCreatureMetabolism actualiza el estado metabólico de una criatura
+func (runtime *simulationRuntime) UpdateCreatureMetabolism(creatureID string, hunger, thirst int) {
+	runtime.mutex.Lock()
+	defer runtime.mutex.Unlock()
+
+	state, exists := runtime.metabolismState[creatureID]
+	if !exists {
+		return
+	}
+
+	state.Hunger = hunger
+	state.Thirst = thirst
 }
 
 type creatureEventLogger struct {
@@ -264,6 +301,11 @@ func (logger creatureEventLogger) Log(group string, messages ...string) error {
 			Hunger:       hunger,
 			Thirst:       thirst,
 		})
+
+		// Actualizar el estado metabólico para esta criatura
+		if hunger > 0 || thirst > 0 {
+			logger.runtime.UpdateCreatureMetabolism(logger.creatureID, hunger, thirst)
+		}
 	}
 
 	return nil

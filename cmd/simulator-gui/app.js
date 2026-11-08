@@ -239,6 +239,12 @@ function selectCreature(creatureID) {
   selectedAge.textContent = String(creature.age);
   logCreatureName.textContent = creature.name || "Unnamed creature";
 
+  // Actualizar los valores iniciales de hambre/sed desde la data de inicialización
+  selectedHunger.textContent = String(creature.hunger_max / 2); // Valor inicial típico
+  selectedMaxHunger.textContent = String(creature.hunger_max);
+  selectedThirst.textContent = String(creature.thirst_max / 2);
+  selectedMaxThirst.textContent = String(creature.thirst_max);
+  
   selectedCapabilities.replaceChildren(...creature.capabilities.map(createCapabilityChip));
   renderSelectedCreatureLogs();
   startStatusUpdates(creatureID);
@@ -314,9 +320,6 @@ function updateCreatureStatusDisplay(status) {
   selectedMaxHunger.textContent = String(status.max_hunger);
   selectedThirst.textContent = String(status.thirst);
   selectedMaxThirst.textContent = String(status.max_thirst);
-  
-  // Mostrar la tasa de hambre (no el valor máximo)
-  selectedHungerRate.textContent = Number(status.hunger_rate).toFixed(4);
 }
 
 function openCreatureStream() {
