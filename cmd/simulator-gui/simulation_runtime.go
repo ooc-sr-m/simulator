@@ -200,14 +200,26 @@ func (runtime *simulationRuntime) getCreatureStatus(creatureID string) (*service
 
 	for _, dog := range runtime.dogs {
 		if dog.Creature.ID.String() == creatureID {
+			// Obtener el servicio de metabolismo para esta criatura específica
+			hunger, thirst := 0, 0
+			
+			// Buscar en los eventos de log recientes para obtener valores actualizados
+			for _, event := range runtime.history {
+				if event.CreatureID == creatureID && event.Hunger > 0 || event.Thirst > 0 {
+					hunger = event.Hunger
+					thirst = event.Thirst
+					break
+				}
+			}
+
 			return &services.CreatureStatus{
 				ID:        dog.Creature.ID.String(),
 				Name:      *dog.Name,
 				Species:   dog.Creature.Species,
-				Hunger:    0,
-				MaxHunger: 0,
-				Thirst:    0,
-				MaxThirst: 0,
+				Hunger:    hunger,
+				MaxHunger: 100, // Valor por defecto si no se puede obtener
+				Thirst:    thirst,
+				MaxThirst: 100, // Valor por defecto si no se puede obtener
 			}, nil
 		}
 	}
