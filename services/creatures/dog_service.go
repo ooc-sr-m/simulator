@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"simulator/helper"
-	"simulator/models/capabilities"
-	"simulator/models/creatures"
 	"simulator/models/creatures/dog"
 	"simulator/services"
 )
