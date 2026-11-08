@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"simulator/helper"
 	creatureservices "simulator/services/creatures"
 	"simulator/models/creatures/dog"
 	"simulator/services"
