@@ -32,7 +32,10 @@ func NewDogService(createdDog *dog.Dog, logger helper.GroupLogger) (*DogService,
 		return nil, fmt.Errorf("dog logger is not initialized")
 	}
 
-	metabolismSvc := services.NewMetabolismService(createdDog.Creature.Genome)
+	metabolismSvc, err := services.NewMetabolismService(createdDog.Creature.Genome)
+	if err != nil {
+		return nil, fmt.Errorf("create metabolism service: %w", err)
+	}
 
 	return &DogService{
 		dog:           createdDog,
