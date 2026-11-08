@@ -240,10 +240,14 @@ function selectCreature(creatureID) {
   logCreatureName.textContent = creature.name || "Unnamed creature";
 
   // Actualizar los valores iniciales de hambre/sed desde la data de inicialización
-  selectedHunger.textContent = String(creature.hunger_max / 2); // Valor inicial típico
+  // Usar los valores reales del genome, no hardcoded
+  selectedHunger.textContent = String(Math.floor(creature.hunger_max / 2));
   selectedMaxHunger.textContent = String(creature.hunger_max);
-  selectedThirst.textContent = String(creature.thirst_max / 2);
+  selectedThirst.textContent = String(Math.floor(creature.thirst_max / 2));
   selectedMaxThirst.textContent = String(creature.thirst_max);
+  
+  // Mostrar las tasas fijas de hambre/sed
+  selectedHungerRate.textContent = Number(creature.hunger_rate).toFixed(4);
   
   selectedCapabilities.replaceChildren(...creature.capabilities.map(createCapabilityChip));
   renderSelectedCreatureLogs();

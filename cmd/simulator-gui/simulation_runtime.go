@@ -44,10 +44,12 @@ type simulationRuntime struct {
 }
 
 type metabolismStatus struct {
-	Hunger    int
-	MaxHunger int
-	Thirst    int
-	MaxThirst int
+	Hunger      int
+	MaxHunger   int
+	Thirst      int
+	MaxThirst   int
+	HungerRate  float64
+	ThirstRate  float64
 }
 
 func newSimulationRuntime() *simulationRuntime {
@@ -64,14 +66,32 @@ func (runtime *simulationRuntime) setWorld(dogs []*dog.Dog, creatures []services
 	runtime.dogs = append([]*dog.Dog(nil), dogs...)
 	runtime.creatures = append([]services.CreatureInitializationEvent(nil), creatures...)
 	
-	// Inicializar el estado metabólico para cada criatura
-	for _, dog := range dogs {
+	// Inicializar el estado metabólico para cada criatura con valores reales del genome
+	for i, dog := range dogs {
 		if dog.Name != nil && *dog.Name != "" {
-			runtime.metabolismState[dog.Creature.ID.String()] = &metabolismStatus{
-				Hunger:    50, // Valor inicial razonable
-				MaxHunger: 100, // Se actualizará con el valor real del genome
-				Thirst:    50,
-				MaxThirst: 100,
+			creatureID := dog.Creature.ID.String()
+			
+			// Obtener los datos de inicialización correspondientes
+			var initEvent services.CreatureInitializationEvent
+			if i < len(creatures) {
+				initEvent = creatures[i]
+			} else {
+				// Fallback si no hay evento de inicialización
+				initEvent = services.CreatureInitializationEvent{
+					HungerMax: 100,
+					HungerRate: 0.5,
+					ThirstMax: 100,
+					ThirstRate: 0.5,
+				}
+			}
+
+			runtime.metabolismState[creatureID] = &metabolismStatus{
+				Hunger:     initEvent.HungerMax / 2, // Valor inicial típico
+				MaxHunger:  initEvent.HungerMax,
+				Thirst:     initEvent.ThirstMax / 2,
+				MaxThirst:  initEvent.ThirstMax,
+				HungerRate: initEvent.HungerRate,
+				ThirstRate: initEvent.ThirstRate,
 			}
 		}
 	}
@@ -227,10 +247,12 @@ func (runtime *simulationRuntime) getCreatureStatus(creatureID string) (*service
 			if !exists {
 				// Si no existe, crear uno con valores por defecto
 				state = &metabolismStatus{
-					Hunger:    50,
-					MaxHunger: 100,
-					Thirst:    50,
-					MaxThirst: 100,
+					Hunger:     50,
+					MaxHunger:  100,
+					Thirst:     50,
+					MaxThirst:  100,
+					HungerRate: 0.5,
+					ThirstRate: 0.5,
 				}
 				runtime.metabolismState[creatureID] = state
 			}
