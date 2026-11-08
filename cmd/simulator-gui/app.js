@@ -28,7 +28,10 @@ const selectedName = document.querySelector("#selected-name");
 const selectedVariant = document.querySelector("#selected-variant");
 const selectedID = document.querySelector("#selected-id");
 const selectedAge = document.querySelector("#selected-age");
-const selectedHungerMax = document.querySelector("#selected-hunger-max");
+const selectedHunger = document.querySelector("#selected-hunger");
+const selectedMaxHunger = document.querySelector("#selected-max-hunger");
+const selectedThirst = document.querySelector("#selected-thirst");
+const selectedMaxThirst = document.querySelector("#selected-max-thirst");
 const selectedHungerRate = document.querySelector("#selected-hunger-rate");
 const selectedCapabilities = document.querySelector("#selected-capabilities");
 const logCreatureName = document.querySelector("#log-creature-name");
@@ -234,8 +237,6 @@ function selectCreature(creatureID) {
   selectedVariant.textContent = creature.variant || "Unclassified variant";
   selectedID.textContent = creature.id;
   selectedAge.textContent = String(creature.age);
-  selectedHungerMax.textContent = String(creature.hunger_max);
-  selectedHungerRate.textContent = Number(creature.hunger_rate).toFixed(4);
   logCreatureName.textContent = creature.name || "Unnamed creature";
 
   selectedCapabilities.replaceChildren(...creature.capabilities.map(createCapabilityChip));
@@ -286,7 +287,7 @@ function appendCreatureLog(entry) {
   creatureLog.querySelector(".console-empty")?.remove();
   creatureLog.append(createConsoleLine(entry));
   creatureEventCount.textContent = `${formatCounter(logs.length)} EVENTS`;
-  creatureLog.scrollTo({ top: creatureLog.scrollHeight, behavior: "smooth" });
+  creatureLog.scrollTop = creatureLog.scrollHeight;
 }
 
 function startStatusUpdates(creatureID) {
@@ -308,8 +309,13 @@ function startStatusUpdates(creatureID) {
 function updateCreatureStatusDisplay(status) {
   if (!status || !selectedCreatureID) return;
 
-  // Actualizar los valores en la interfaz
-  selectedHungerMax.textContent = String(status.max_hunger);
+  // Actualizar los valores de hambre y sed en tiempo real
+  selectedHunger.textContent = String(status.hunger);
+  selectedMaxHunger.textContent = String(status.max_hunger);
+  selectedThirst.textContent = String(status.thirst);
+  selectedMaxThirst.textContent = String(status.max_thirst);
+  
+  // Mostrar la tasa de hambre (no el valor máximo)
   selectedHungerRate.textContent = Number(status.hunger_rate).toFixed(4);
 }
 
