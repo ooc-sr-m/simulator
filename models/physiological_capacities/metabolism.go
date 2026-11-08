@@ -5,4 +5,6 @@ type Metabolism struct {
 	Thirst     int
 	HungerRate float64
 	ThirstRate float64
+	HungerMax  int
+	ThirstMax  int
 }

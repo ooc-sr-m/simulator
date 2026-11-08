@@ -24,5 +24,13 @@ func GenomeProfile() creatures.SpeciesDefinition {
 			Min: 0.03,
 			Max: 0.10,
 		},
+		ThirstMax: creatures.IntRange{
+			Min: 75,
+			Max: 115,
+		},
+		ThirstRate: creatures.FloatRange{
+			Min: 0.04,
+			Max: 0.12,
+		},
 	}
 }

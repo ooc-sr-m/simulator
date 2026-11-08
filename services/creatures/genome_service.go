@@ -1,4 +1,4 @@
-package services
+package creatures
 
 import (
 	"fmt"
@@ -33,6 +33,8 @@ func (generator *GenomeGenerator) Generate(species creatures.SpeciesDefinition) 
 		Labels:     cloneCapabilities(species.Labels),
 		HungerMax:  randomInt(generator.random, species.HungerMax),
 		HungerRate: randomFloat(generator.random, species.HungerRate),
+		ThirstMax:  randomInt(generator.random, species.ThirstMax),
+		ThirstRate: randomFloat(generator.random, species.ThirstRate),
 	}, nil
 }
 
@@ -55,6 +57,22 @@ func ValidateSpeciesDefinition(species creatures.SpeciesDefinition) error {
 	}
 	if species.HungerRate.Min > species.HungerRate.Max {
 		return fmt.Errorf("invalid hunger rate range: minimum exceeds maximum")
+	}
+	if species.ThirstMax.Min < 0 {
+		return fmt.Errorf("thirst max minimum cannot be negative")
+	}
+	if species.ThirstMax.Min > species.ThirstMax.Max {
+		return fmt.Errorf("invalid thirst max range: minimum exceeds maximum")
+	}
+	if math.IsNaN(species.ThirstRate.Min) || math.IsNaN(species.ThirstRate.Max) ||
+		math.IsInf(species.ThirstRate.Min, 0) || math.IsInf(species.ThirstRate.Max, 0) {
+		return fmt.Errorf("thirst rate range must contain finite numbers")
+	}
+	if species.ThirstRate.Min < 0 {
+		return fmt.Errorf("thirst rate minimum cannot be negative")
+	}
+	if species.ThirstRate.Min > species.ThirstRate.Max {
+		return fmt.Errorf("invalid thirst rate range: minimum exceeds maximum")
 	}
 	return nil
 }

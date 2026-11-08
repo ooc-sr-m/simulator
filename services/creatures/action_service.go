@@ -1,4 +1,4 @@
-package services
+package creatures
 
 import (
 	"simulator/models/actions"
