@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"sync"
 
 	"github.com/google/uuid"
 
@@ -17,6 +18,8 @@ import (
 // WorldService gestiona el mundo de simulación y la creación de criaturas
 type WorldService struct {
 	nameRandom *rand.Rand
+	dogs       []*dog.Dog
+	mutex      sync.Mutex
 }
 
 // CreatureInitializationEvent representa un evento de inicialización de criatura
@@ -31,6 +34,17 @@ type CreatureInitializationEvent struct {
 	HungerMax    int      `json:"hunger_max"`
 	HungerRate   float64  `json:"hunger_rate"`
 	Capabilities []string `json:"capabilities"`
+}
+
+// CreatureStatus representa el estado actual de una criatura
+type CreatureStatus struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Species   string `json:"species"`
+	Hunger    int    `json:"hunger"`
+	MaxHunger int    `json:"max_hunger"`
+	Thirst    int    `json:"thirst"`
+	MaxThirst int    `json:"max_thirst"`
 }
 
 // CreatureInitializationObserver es un callback para eventos de inicialización de criaturas
@@ -150,5 +164,52 @@ func (service *WorldService) CreateCreaturesWithObserver(observer CreatureInitia
 		dogs = append(dogs, dogInstance)
 	}
 
+	service.mutex.Lock()
+	service.dogs = dogs
+	service.mutex.Unlock()
+
 	return dogs, nil
+}
+
+// GetCreatureStatus devuelve el estado actual de una criatura específica
+func (service *WorldService) GetCreatureStatus(creatureID string) (*CreatureStatus, error) {
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+
+	for _, dog := range service.dogs {
+		if dog.Creature.ID.String() == creatureID {
+			return &CreatureStatus{
+				ID:        dog.Creature.ID.String(),
+				Name:      *dog.Name,
+				Species:   dog.Creature.Species,
+				Hunger:    0, // Se llenará con el servicio de metabolismo
+				MaxHunger: dog.Creature.Genome.HungerMax,
+				Thirst:    0, // Se llenará con el servicio de metabolismo
+				MaxThirst: dog.Creature.Genome.ThirstMax,
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("creature not found: %s", creatureID)
+}
+
+// GetAllCreatureStatus devuelve el estado actual de todas las criaturas
+func (service *WorldService) GetAllCreatureStatus() ([]*CreatureStatus, error) {
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+
+	statuses := make([]*CreatureStatus, 0, len(service.dogs))
+	for _, dog := range service.dogs {
+		statuses = append(statuses, &CreatureStatus{
+			ID:        dog.Creature.ID.String(),
+			Name:      *dog.Name,
+			Species:   dog.Creature.Species,
+			Hunger:    0, // Se llenará con el servicio de metabolismo
+			MaxHunger: dog.Creature.Genome.HungerMax,
+			Thirst:    0, // Se llenará con el servicio de metabolismo
+			MaxThirst: dog.Creature.Genome.ThirstMax,
+		})
+	}
+
+	return statuses, nil
 }

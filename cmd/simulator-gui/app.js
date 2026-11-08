@@ -45,6 +45,7 @@ let displayedProgress = 0;
 let progressAnimation;
 let selectedCreatureID = "";
 let creatureStream;
+let statusInterval = null;
 
 function preferredTheme() {
   const stored = localStorage.getItem("simulator-theme");
@@ -239,6 +240,7 @@ function selectCreature(creatureID) {
 
   selectedCapabilities.replaceChildren(...creature.capabilities.map(createCapabilityChip));
   renderSelectedCreatureLogs();
+  startStatusUpdates(creatureID);
 }
 
 function renderSelectedCreatureLogs() {
@@ -285,6 +287,47 @@ function appendCreatureLog(entry) {
   creatureLog.append(createConsoleLine(entry));
   creatureEventCount.textContent = `${formatCounter(logs.length)} EVENTS`;
   creatureLog.scrollTo({ top: creatureLog.scrollHeight, behavior: "smooth" });
+}
+
+function startStatusUpdates(creatureID) {
+  if (statusInterval) clearInterval(statusInterval);
+  
+  statusInterval = setInterval(async () => {
+    try {
+      const response = await fetch(`/api/world/status/${creatureID}`);
+      if (response.ok) {
+        const status = await response.json();
+        updateCreatureStatusDisplay(status);
+      }
+    } catch (err) {
+      console.error("Failed to fetch creature status:", err);
+    }
+  }, 1000);
+}
+
+function updateCreatureStatusDisplay(status) {
+  if (!status || !selectedCreatureID) return;
+
+  const statusContainer = document.getElementById(`creature-status-${selectedCreatureID}`);
+  if (statusContainer) {
+    const hungerPercent = Math.round((status.hunger / status.max_hunger) * 100);
+    const thirstPercent = Math.round((status.thirst / status.max_thirst) * 100);
+
+    statusContainer.innerHTML = `
+      <div class="status-bar">
+        <span>Hambre: ${status.hunger}/${status.max_hunger}</span>
+        <div class="progress-bar hunger">
+          <div class="progress-fill" style="width: ${hungerPercent}%"></div>
+        </div>
+      </div>
+      <div class="status-bar">
+        <span>Sed: ${status.thirst}/${status.max_thirst}</span>
+        <div class="progress-bar thirst">
+          <div class="progress-fill" style="width: ${thirstPercent}%"></div>
+        </div>
+      </div>
+    `;
+  }
 }
 
 function openCreatureStream() {

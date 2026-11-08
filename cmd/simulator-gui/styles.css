@@ -705,6 +705,40 @@ h1 {
 .console-empty strong { margin-top: 0.9rem; font: 700 0.65rem/1.4 "Cascadia Code", Consolas, monospace; letter-spacing: 0.09em; }
 .console-empty small { max-width: 22rem; margin-top: 0.6rem; color: #62717b; font-size: 0.67rem; line-height: 1.5; }
 
+/* Estilos para barras de estado de metabolismo */
+.status-bar {
+  margin-bottom: 0.75rem;
+}
+
+.status-bar span {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin-bottom: 0.25rem;
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.hunger .progress-fill {
+  background: linear-gradient(90deg, #f5a623, #d9534f);
+}
+
+.thirst .progress-fill {
+  background: linear-gradient(90deg, #4a6fa5, #7aa2f7);
+}
+
 @keyframes screen-in { from { opacity: 0; transform: translateY(0.75rem); } }
 @keyframes activity { from { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.7); } to { box-shadow: 0 0 0 0.65rem rgba(var(--accent-rgb), 0); } }
 

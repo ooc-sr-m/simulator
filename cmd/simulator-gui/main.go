@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	"simulator/services"
@@ -85,6 +86,8 @@ func newHandler(config guiConfig) http.Handler {
 	mux.HandleFunc("GET /api/world/initialize", initializationHandler(config, runtime))
 	mux.HandleFunc("POST /api/world/start", runtime.startHandler)
 	mux.HandleFunc("GET /api/world/logs", runtime.logsHandler)
+	mux.HandleFunc("GET /api/world/status/{id}", statusHandler(config, runtime))
+
 	return mux
 }
 
@@ -209,4 +212,31 @@ func openBrowser(url string) error {
 		command = exec.Command("xdg-open", url)
 	}
 	return command.Start()
+}
+
+func statusHandler(config guiConfig, runtime *simulationRuntime) http.HandlerFunc {
+	return func(response http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodGet {
+			http.Error(response, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Extract creature ID from URL path
+		path := strings.TrimPrefix(request.URL.Path, "/api/world/status/")
+		id := path
+		if id == "" {
+			http.Error(response, "creature ID required", http.StatusBadRequest)
+			return
+		}
+
+		worldService := config.newWorld()
+		status, err := worldService.GetCreatureStatus(id)
+		if err != nil {
+			http.Error(response, fmt.Sprintf("get creature status: %v", err), http.StatusNotFound)
+			return
+		}
+
+		response.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(response).Encode(status)
+	}
 }
