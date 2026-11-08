@@ -35,7 +35,6 @@ const logCreatureName = document.querySelector("#log-creature-name");
 const creatureLog = document.querySelector("#creature-log");
 const creatureEventCount = document.querySelector("#creature-event-count");
 const clearCreatureLog = document.querySelector("#clear-creature-log");
-const metabolicStatus = document.querySelector("#creature-metabolic-status");
 
 const species = new Set();
 const creatures = [];
@@ -309,24 +308,9 @@ function startStatusUpdates(creatureID) {
 function updateCreatureStatusDisplay(status) {
   if (!status || !selectedCreatureID) return;
 
-  // Actualizar el contenedor de estado metabólico
-  const hungerPercent = Math.round((status.hunger / status.max_hunger) * 100);
-  const thirstPercent = Math.round((status.thirst / status.max_thirst) * 100);
-
-  metabolicStatus.innerHTML = `
-    <div class="metabolic-status-bar">
-      <span>Hambre: ${status.hunger}/${status.max_hunger}</span>
-      <div class="progress-bar hunger">
-        <div class="progress-fill" style="width: ${hungerPercent}%"></div>
-      </div>
-    </div>
-    <div class="metabolic-status-bar">
-      <span>Sed: ${status.thirst}/${status.max_thirst}</span>
-      <div class="progress-bar thirst">
-        <div class="progress-fill" style="width: ${thirstPercent}%"></div>
-      </div>
-    </div>
-  `;
+  // Actualizar los valores en la interfaz
+  selectedHungerMax.textContent = String(status.max_hunger);
+  selectedHungerRate.textContent = Number(status.hunger_rate).toFixed(4);
 }
 
 function openCreatureStream() {
