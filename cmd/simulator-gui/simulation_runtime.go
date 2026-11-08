@@ -80,18 +80,16 @@ func (runtime *simulationRuntime) setWorld(dogs []*dog.Dog, creatures []services
 				initEvent = services.CreatureInitializationEvent{
 					HungerMax: 100,
 					HungerRate: 0.5,
-					ThirstMax: 100,
-					ThirstRate: 0.5,
 				}
 			}
 
 			runtime.metabolismState[creatureID] = &metabolismStatus{
 				Hunger:     initEvent.HungerMax / 2, // Valor inicial típico
 				MaxHunger:  initEvent.HungerMax,
-				Thirst:     initEvent.ThirstMax / 2,
-				MaxThirst:  initEvent.ThirstMax,
+				Thirst:     50, // Valor por defecto
+				MaxThirst:  100, // Valor por defecto
 				HungerRate: initEvent.HungerRate,
-				ThirstRate: initEvent.ThirstRate,
+				ThirstRate: 0.5, // Valor por defecto
 			}
 		}
 	}
