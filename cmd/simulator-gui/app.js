@@ -33,6 +33,7 @@ const selectedMaxHunger = document.querySelector("#selected-max-hunger");
 const selectedThirst = document.querySelector("#selected-thirst");
 const selectedMaxThirst = document.querySelector("#selected-max-thirst");
 const selectedHungerRate = document.querySelector("#selected-hunger-rate");
+const selectedThirstRate = document.querySelector("#selected-thirst-rate");
 const selectedCapabilities = document.querySelector("#selected-capabilities");
 const logCreatureName = document.querySelector("#log-creature-name");
 const creatureLog = document.querySelector("#creature-log");
@@ -243,11 +244,14 @@ function selectCreature(creatureID) {
   // Usar los valores reales del genome, no hardcoded
   selectedHunger.textContent = String(Math.floor(creature.hunger_max / 2));
   selectedMaxHunger.textContent = String(creature.hunger_max);
-  selectedThirst.textContent = String(Math.floor(creature.thirst_max / 2));
-  selectedMaxThirst.textContent = String(creature.thirst_max);
+  
+  // Thirst values - usar default ya que no están en la data de inicialización
+  selectedThirst.textContent = "50";
+  selectedMaxThirst.textContent = "100";
   
   // Mostrar las tasas fijas de hambre/sed
   selectedHungerRate.textContent = Number(creature.hunger_rate).toFixed(4);
+  selectedThirstRate.textContent = "0.5000"; // Valor por defecto
   
   selectedCapabilities.replaceChildren(...creature.capabilities.map(createCapabilityChip));
   renderSelectedCreatureLogs();

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -87,7 +88,7 @@ func (runtime *simulationRuntime) setWorld(dogs []*dog.Dog, creatures []services
 				Hunger:     initEvent.HungerMax / 2, // Valor inicial típico
 				MaxHunger:  initEvent.HungerMax,
 				Thirst:     50, // Valor por defecto
-				MaxThirst:  100, // Valor por defecto
+				MaxThirst:  100, // Valor por defecto (se puede ajustar según genome)
 				HungerRate: initEvent.HungerRate,
 				ThirstRate: 0.5, // Valor por defecto
 			}
@@ -304,9 +305,37 @@ func (logger creatureEventLogger) Log(group string, messages ...string) error {
 			for _, part := range parts {
 				part = strings.TrimSpace(part)
 				if strings.HasPrefix(part, "hambre:") {
-					fmt.Sscanf(strings.TrimPrefix(part, "hambre:"), "%d/%d", &hunger, &thirst)
+					// Extraer valores de hambre: X/Y
+					hungerData := strings.TrimPrefix(part, "hambre:")
+					parts2 := strings.Split(hungerData, "/")
+					if len(parts2) >= 1 {
+						val, err := strconv.Atoi(strings.TrimSpace(parts2[0]))
+						if err == nil {
+							hunger = val
+						}
+					}
+					if len(parts2) >= 2 {
+						val, err := strconv.Atoi(strings.TrimSpace(parts2[1]))
+						if err == nil {
+							thirst = val
+						}
+					}
 				} else if strings.HasPrefix(part, "sed:") {
-					fmt.Sscanf(strings.TrimPrefix(part, "sed:"), "%d/%d", &thirst, &hunger)
+					// Extraer valores de sed: X/Y
+					thirstData := strings.TrimPrefix(part, "sed:")
+					parts2 := strings.Split(thirstData, "/")
+					if len(parts2) >= 1 {
+						val, err := strconv.Atoi(strings.TrimSpace(parts2[0]))
+						if err == nil {
+							thirst = val
+						}
+					}
+					if len(parts2) >= 2 {
+						val, err := strconv.Atoi(strings.TrimSpace(parts2[1]))
+						if err == nil {
+							hunger = val
+						}
+					}
 				}
 			}
 		}
