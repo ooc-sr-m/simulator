@@ -740,12 +740,12 @@ h1 {
   transition: width 0.3s ease;
 }
 
-.hunger .progress-fill {
-  background: linear-gradient(90deg, #f5a623, #d9534f);
+.metabolic-status .hunger .progress-fill {
+  background: linear-gradient(90deg, var(--amber), var(--danger));
 }
 
-.thirst .progress-fill {
-  background: linear-gradient(90deg, #4a6fa5, #7aa2f7);
+.metabolic-status .thirst .progress-fill {
+  background: linear-gradient(90deg, var(--cyan), #7aa2f7);
 }
 
 @keyframes screen-in { from { opacity: 0; transform: translateY(0.75rem); } }
