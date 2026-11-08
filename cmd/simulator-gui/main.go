@@ -189,18 +189,6 @@ func newLogEvent(level string, scope string, message string) logEvent {
 	}
 }
 
-func writeEvent(destination io.Writer, flusher http.Flusher, eventName string, payload any) error {
-	encodedPayload, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("encode %s event: %w", eventName, err)
-	}
-	if _, err := fmt.Fprintf(destination, "event: %s\ndata: %s\n\n", eventName, encodedPayload); err != nil {
-		return fmt.Errorf("write %s event: %w", eventName, err)
-	}
-	flusher.Flush()
-	return nil
-}
-
 func openBrowser(url string) error {
 	var command *exec.Cmd
 	switch runtime.GOOS {
