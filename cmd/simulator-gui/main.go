@@ -77,16 +77,16 @@ func main() {
 }
 
 func newHandler(config guiConfig) http.Handler {
-	runtime := newSimulationRuntime()
+	simRuntime := newSimulationRuntime()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", serveAsset("index.html", "text/html; charset=utf-8"))
 	mux.HandleFunc("GET /world", serveAsset("index.html", "text/html; charset=utf-8"))
 	mux.HandleFunc("GET /styles.css", serveAsset("styles.css", "text/css; charset=utf-8"))
 	mux.HandleFunc("GET /app.js", serveAsset("app.js", "text/javascript; charset=utf-8"))
-	mux.HandleFunc("GET /api/world/initialize", initializationHandler(config, runtime))
-	mux.HandleFunc("POST /api/world/start", runtime.startHandler)
-	mux.HandleFunc("GET /api/world/logs", runtime.logsHandler)
-	mux.HandleFunc("GET /api/world/status/{id}", statusHandler(config, runtime))
+	mux.HandleFunc("GET /api/world/initialize", initializationHandler(config, simRuntime))
+	mux.HandleFunc("POST /api/world/start", simRuntime.startHandler)
+	mux.HandleFunc("GET /api/world/logs", simRuntime.logsHandler)
+	mux.HandleFunc("GET /api/world/status/{id}", statusHandler(simRuntime))
 
 	return mux
 }
@@ -104,7 +104,7 @@ func serveAsset(name string, contentType string) http.HandlerFunc {
 	}
 }
 
-func initializationHandler(config guiConfig, runtime *simulationRuntime) http.HandlerFunc {
+func initializationHandler(config guiConfig, simRuntime *simulationRuntime) http.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request) {
 		flusher, ok := response.(http.Flusher)
 		if !ok {
@@ -117,7 +117,7 @@ func initializationHandler(config guiConfig, runtime *simulationRuntime) http.Ha
 		response.Header().Set("Connection", "keep-alive")
 		response.Header().Set("X-Content-Type-Options", "nosniff")
 
-		if existingCreatures, running := runtime.worldSnapshot(); len(existingCreatures) > 0 {
+		if existingCreatures, running := simRuntime.worldSnapshot(); len(existingCreatures) > 0 {
 			status := "World ready to start"
 			if running {
 				status = "World simulation online"
@@ -171,7 +171,7 @@ func initializationHandler(config guiConfig, runtime *simulationRuntime) http.Ha
 			_ = writeEvent(response, flusher, "world-error", statusEvent{Message: err.Error()})
 			return
 		}
-		runtime.setWorld(createdCreatures, creatureEvents)
+		simRuntime.setWorld(createdCreatures, creatureEvents)
 
 		if err := writeEvent(response, flusher, "log", newLogEvent("READY", "WORLD", fmt.Sprintf("World online · %d creatures active", len(createdCreatures)))); err != nil {
 			return
@@ -214,7 +214,7 @@ func openBrowser(url string) error {
 	return command.Start()
 }
 
-func statusHandler(config guiConfig, runtime *simulationRuntime) http.HandlerFunc {
+func statusHandler(simRuntime *simulationRuntime) http.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodGet {
 			http.Error(response, "method not allowed", http.StatusMethodNotAllowed)
@@ -229,8 +229,7 @@ func statusHandler(config guiConfig, runtime *simulationRuntime) http.HandlerFun
 			return
 		}
 
-		worldService := config.newWorld()
-		status, err := worldService.GetCreatureStatus(id)
+		status, err := simRuntime.getCreatureStatus(id)
 		if err != nil {
 			http.Error(response, fmt.Sprintf("get creature status: %v", err), http.StatusNotFound)
 			return

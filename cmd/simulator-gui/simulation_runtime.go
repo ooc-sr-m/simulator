@@ -39,6 +39,7 @@ type simulationRuntime struct {
 	running     bool
 	history     []creatureLogEvent
 	subscribers map[chan creatureLogEvent]struct{}
+	worldService *services.WorldService
 }
 
 func newSimulationRuntime() *simulationRuntime {
@@ -192,6 +193,27 @@ func (runtime *simulationRuntime) logsHandler(response http.ResponseWriter, requ
 			return
 		}
 	}
+}
+
+func (runtime *simulationRuntime) getCreatureStatus(creatureID string) (*services.CreatureStatus, error) {
+	runtime.mutex.Lock()
+	defer runtime.mutex.Unlock()
+
+	for _, dog := range runtime.dogs {
+		if dog.Creature.ID.String() == creatureID {
+			return &services.CreatureStatus{
+				ID:        dog.Creature.ID.String(),
+				Name:      *dog.Name,
+				Species:   dog.Creature.Species,
+				Hunger:    0,
+				MaxHunger: 0,
+				Thirst:    0,
+				MaxThirst: 0,
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("creature not found")
 }
 
 type creatureEventLogger struct {
