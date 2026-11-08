@@ -305,7 +305,7 @@ func (logger creatureEventLogger) Log(group string, messages ...string) error {
 			for _, part := range parts {
 				part = strings.TrimSpace(part)
 				if strings.HasPrefix(part, "hambre:") {
-					// Extraer valores de hambre: X/Y
+					// Extraer valores de hambre: X/Y donde X es hunger actual y Y es max_hunger
 					hungerData := strings.TrimPrefix(part, "hambre:")
 					parts2 := strings.Split(hungerData, "/")
 					if len(parts2) >= 1 {
@@ -317,11 +317,15 @@ func (logger creatureEventLogger) Log(group string, messages ...string) error {
 					if len(parts2) >= 2 {
 						val, err := strconv.Atoi(strings.TrimSpace(parts2[1]))
 						if err == nil {
-							thirst = val
+							// Actualizar max_hunger si lo vemos en el log
+							state, exists := logger.runtime.metabolismState[logger.creatureID]
+							if exists {
+								state.MaxHunger = val
+							}
 						}
 					}
 				} else if strings.HasPrefix(part, "sed:") {
-					// Extraer valores de sed: X/Y
+					// Extraer valores de sed: X/Y donde X es thirst actual y Y es max_thirst
 					thirstData := strings.TrimPrefix(part, "sed:")
 					parts2 := strings.Split(thirstData, "/")
 					if len(parts2) >= 1 {
@@ -333,7 +337,11 @@ func (logger creatureEventLogger) Log(group string, messages ...string) error {
 					if len(parts2) >= 2 {
 						val, err := strconv.Atoi(strings.TrimSpace(parts2[1]))
 						if err == nil {
-							hunger = val
+							// Actualizar max_thirst si lo vemos en el log
+							state, exists := logger.runtime.metabolismState[logger.creatureID]
+							if exists {
+								state.MaxThirst = val
+							}
 						}
 					}
 				}
