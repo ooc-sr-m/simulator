@@ -705,29 +705,29 @@ h1 {
 .console-empty strong { margin-top: 0.9rem; font: 700 0.65rem/1.4 "Cascadia Code", Consolas, monospace; letter-spacing: 0.09em; }
 .console-empty small { max-width: 22rem; margin-top: 0.6rem; color: #62717b; font-size: 0.67rem; line-height: 1.5; }
 
-/* Estilos para barras de estado de metabolismo */
-.metabolic-status {
+/* Estilos para barras de estado de metabolismo - completamente aislados */
+#creature-metabolic-status {
   margin-top: 1rem;
   padding: 0.75rem;
   background: var(--panel-alt);
   border-left: 2px solid var(--line-strong);
 }
 
-.metabolic-status-bar {
+#creature-metabolic-status .metabolic-status-bar {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
   margin-bottom: 0.75rem;
 }
 
-.metabolic-status-bar span {
+#creature-metabolic-status .metabolic-status-bar span {
   font-size: 0.62rem;
   color: var(--muted);
   font-family: "Cascadia Code", Consolas, monospace;
   letter-spacing: 0.08em;
 }
 
-.progress-bar {
+#creature-metabolic-status .progress-bar {
   width: 100%;
   height: 8px;
   background: var(--line);
@@ -735,16 +735,16 @@ h1 {
   overflow: hidden;
 }
 
-.progress-fill {
+#creature-metabolic-status .progress-fill {
   height: 100%;
   transition: width 0.3s ease;
 }
 
-.metabolic-status .hunger .progress-fill {
+#creature-metabolic-status .hunger .progress-fill {
   background: linear-gradient(90deg, var(--amber), var(--danger));
 }
 
-.metabolic-status .thirst .progress-fill {
+#creature-metabolic-status .thirst .progress-fill {
   background: linear-gradient(90deg, var(--cyan), #7aa2f7);
 }
 
