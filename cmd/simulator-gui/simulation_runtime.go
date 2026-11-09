@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"simulator/models/creatures/dog"
+	worldmap "simulator/models/map"
 	"simulator/services"
 	creatureservices "simulator/services/creatures"
 )
@@ -28,8 +29,35 @@ type creatureLogEvent struct {
 	Message      string `json:"message"`
 }
 
+type worldMapSnapshot struct {
+	Columns       int             `json:"columns"`
+	Rows          int             `json:"rows"`
+	CreatureCount int             `json:"creature_count"`
+	Chunks        []worldMapChunk `json:"chunks"`
+}
+
+type worldMapChunk struct {
+	ID          string           `json:"id"`
+	GridX       int              `json:"grid_x"`
+	GridY       int              `json:"grid_y"`
+	Width       float64          `json:"width"`
+	Height      float64          `json:"height"`
+	PixelWidth  int              `json:"pixel_width"`
+	PixelHeight int              `json:"pixel_height"`
+	Entities    []worldMapEntity `json:"entities"`
+}
+
+type worldMapEntity struct {
+	ID      string  `json:"id"`
+	Name    string  `json:"name"`
+	Species string  `json:"species"`
+	X       float64 `json:"x"`
+	Y       float64 `json:"y"`
+}
+
 type simulationRuntime struct {
 	mutex       sync.Mutex
+	world       *worldmap.GlobalScene
 	dogs        []*dog.Dog
 	dogServices map[string]*creatureservices.DogService
 	creatures   []services.CreatureInitializationEvent
@@ -46,12 +74,83 @@ func newSimulationRuntime() *simulationRuntime {
 	}
 }
 
-func (runtime *simulationRuntime) setWorld(dogs []*dog.Dog, creatures []services.CreatureInitializationEvent) {
+func (runtime *simulationRuntime) setWorld(world *worldmap.GlobalScene, dogs []*dog.Dog, creatures []services.CreatureInitializationEvent) {
 	runtime.mutex.Lock()
 	defer runtime.mutex.Unlock()
 
+	runtime.world = world
 	runtime.dogs = append([]*dog.Dog(nil), dogs...)
 	runtime.creatures = append([]services.CreatureInitializationEvent(nil), creatures...)
+}
+
+func (runtime *simulationRuntime) mapHandler(response http.ResponseWriter, request *http.Request) {
+	snapshot, err := runtime.getMapSnapshot()
+	if err != nil {
+		http.Error(response, err.Error(), http.StatusConflict)
+		return
+	}
+
+	response.Header().Set("Content-Type", "application/json")
+	response.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(response).Encode(snapshot)
+}
+
+func (runtime *simulationRuntime) getMapSnapshot() (*worldMapSnapshot, error) {
+	runtime.mutex.Lock()
+	defer runtime.mutex.Unlock()
+
+	if runtime.world == nil || len(runtime.world.Chunks) == 0 {
+		return nil, fmt.Errorf("world map has not been initialized")
+	}
+
+	dogsByID := make(map[string]*dog.Dog, len(runtime.dogs))
+	for _, currentDog := range runtime.dogs {
+		dogsByID[currentDog.Creature.ID.String()] = currentDog
+	}
+
+	snapshot := &worldMapSnapshot{
+		CreatureCount: len(runtime.dogs),
+		Chunks:        make([]worldMapChunk, 0, len(runtime.world.Chunks)),
+	}
+	for _, chunk := range runtime.world.Chunks {
+		if chunk.GridX+1 > snapshot.Columns {
+			snapshot.Columns = chunk.GridX + 1
+		}
+		if chunk.GridY+1 > snapshot.Rows {
+			snapshot.Rows = chunk.GridY + 1
+		}
+
+		mapChunk := worldMapChunk{
+			ID:          chunk.ID.String(),
+			GridX:       chunk.GridX,
+			GridY:       chunk.GridY,
+			Width:       chunk.Width,
+			Height:      chunk.Height,
+			PixelWidth:  chunk.PixelWidth,
+			PixelHeight: chunk.PixelHeight,
+			Entities:    make([]worldMapEntity, 0, len(chunk.EntityIDs)),
+		}
+		for _, entityID := range chunk.EntityIDs {
+			currentDog := dogsByID[entityID]
+			if currentDog == nil {
+				continue
+			}
+			name := "Unnamed creature"
+			if currentDog.Name != nil {
+				name = *currentDog.Name
+			}
+			mapChunk.Entities = append(mapChunk.Entities, worldMapEntity{
+				ID:      entityID,
+				Name:    name,
+				Species: currentDog.Creature.Species,
+				X:       currentDog.Creature.Position.X,
+				Y:       currentDog.Creature.Position.Y,
+			})
+		}
+		snapshot.Chunks = append(snapshot.Chunks, mapChunk)
+	}
+
+	return snapshot, nil
 }
 
 func (runtime *simulationRuntime) worldSnapshot() ([]services.CreatureInitializationEvent, bool) {

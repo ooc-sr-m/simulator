@@ -21,6 +21,15 @@ const (
 	creatureDelay       = 140 * time.Millisecond
 )
 
+var graphicalWorldConfig = services.WorldGenerationConfig{
+	Columns:          4,
+	Rows:             3,
+	ChunkWidth:       100,
+	ChunkHeight:      100,
+	ChunkPixelWidth:  240,
+	ChunkPixelHeight: 240,
+}
+
 //go:embed index.html styles.css app.js
 var assets embed.FS
 
@@ -80,11 +89,13 @@ func newHandler(config guiConfig) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", serveAsset("index.html", "text/html; charset=utf-8"))
 	mux.HandleFunc("GET /world", serveAsset("index.html", "text/html; charset=utf-8"))
+	mux.HandleFunc("GET /map", serveAsset("index.html", "text/html; charset=utf-8"))
 	mux.HandleFunc("GET /styles.css", serveAsset("styles.css", "text/css; charset=utf-8"))
 	mux.HandleFunc("GET /app.js", serveAsset("app.js", "text/javascript; charset=utf-8"))
 	mux.HandleFunc("GET /api/world/initialize", initializationHandler(config, simRuntime))
 	mux.HandleFunc("POST /api/world/start", simRuntime.startHandler)
 	mux.HandleFunc("GET /api/world/logs", simRuntime.logsHandler)
+	mux.HandleFunc("GET /api/world/map", simRuntime.mapHandler)
 	mux.HandleFunc("GET /api/world/status/{id}", statusHandler(simRuntime))
 
 	return mux
@@ -144,6 +155,19 @@ func initializationHandler(config guiConfig, simRuntime *simulationRuntime) http
 		}
 
 		worldService := config.newWorld()
+		generatedWorld, err := worldService.CreateWorldWithConfig(graphicalWorldConfig)
+		if err != nil {
+			_ = writeEvent(response, flusher, "world-error", statusEvent{Message: err.Error()})
+			return
+		}
+		if err := writeEvent(response, flusher, "log", newLogEvent(
+			"OK",
+			"MAP",
+			fmt.Sprintf("World grid online · %d chunks", len(generatedWorld.Chunks)),
+		)); err != nil {
+			return
+		}
+
 		var streamErr error
 		creatureEvents := make([]services.CreatureInitializationEvent, 0)
 		createdCreatures, err := worldService.CreateCreaturesWithObserver(func(event services.CreatureInitializationEvent) {
@@ -170,7 +194,7 @@ func initializationHandler(config guiConfig, simRuntime *simulationRuntime) http
 			_ = writeEvent(response, flusher, "world-error", statusEvent{Message: err.Error()})
 			return
 		}
-		simRuntime.setWorld(createdCreatures, creatureEvents)
+		simRuntime.setWorld(generatedWorld, createdCreatures, creatureEvents)
 
 		if err := writeEvent(response, flusher, "log", newLogEvent("READY", "WORLD", fmt.Sprintf("World online · %d creatures active", len(createdCreatures)))); err != nil {
 			return

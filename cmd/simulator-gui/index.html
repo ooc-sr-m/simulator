@@ -117,6 +117,11 @@
       </section>
       </section>
 
+      <nav class="runtime-tabs" id="runtime-tabs" aria-label="Runtime views" hidden>
+        <button class="runtime-tab active" type="button" data-runtime-view="creatures" aria-pressed="true">CREATURES</button>
+        <button class="runtime-tab" type="button" data-runtime-view="map" aria-pressed="false">WORLD MAP</button>
+      </nav>
+
       <section class="screen runtime-screen" id="world-screen" hidden aria-labelledby="runtime-title">
         <header class="runtime-hero">
           <div>
@@ -204,6 +209,37 @@
             <footer class="console-footer"><span>STREAM /api/world/logs</span><span id="creature-event-count">000 EVENTS</span></footer>
           </section>
         </div>
+      </section>
+
+      <section class="screen runtime-screen map-screen" id="map-screen" hidden aria-labelledby="map-title">
+        <header class="runtime-hero map-hero">
+          <div>
+            <p class="kicker"><span>SPATIAL OVERVIEW</span><span class="kicker-line"></span><span>LIVE</span></p>
+            <h1 id="map-title">WORLD MAP</h1>
+            <p class="phase">Chunks form the world grid. Each signal represents one active creature.</p>
+          </div>
+          <dl class="map-telemetry" aria-label="Map telemetry">
+            <div><dt>CHUNKS</dt><dd id="map-chunk-count">00</dd></div>
+            <div><dt>ENTITIES</dt><dd id="map-entity-count">00</dd></div>
+          </dl>
+        </header>
+
+        <section class="panel world-map-panel" aria-labelledby="map-grid-title">
+          <header class="panel-header">
+            <div>
+              <p class="panel-index">04 / GLOBAL SCENE</p>
+              <h2 id="map-grid-title">CHUNK GRID</h2>
+            </div>
+            <p class="panel-note">SELECT A SIGNAL TO INSPECT ITS ENTITY</p>
+          </header>
+          <div class="world-map-viewport">
+            <div class="world-map-grid" id="world-map-grid" aria-live="polite"></div>
+          </div>
+          <footer class="map-legend">
+            <span><i class="legend-signal" aria-hidden="true"></i> ACTIVE ENTITY</span>
+            <span>LOCAL COORDINATES PER CHUNK</span>
+          </footer>
+        </section>
       </section>
     </main>
 

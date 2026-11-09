@@ -18,6 +18,9 @@ const eventCount = document.querySelector("#event-count");
 const clearLog = document.querySelector("#clear-log");
 const bootScreen = document.querySelector("#boot-screen");
 const worldScreen = document.querySelector("#world-screen");
+const mapScreen = document.querySelector("#map-screen");
+const runtimeTabs = document.querySelector("#runtime-tabs");
+const runtimeViewButtons = document.querySelectorAll("[data-runtime-view]");
 const launchPanel = document.querySelector("#launch-panel");
 const startWorld = document.querySelector("#start-world");
 const runtimeCreatureList = document.querySelector("#runtime-creature-list");
@@ -39,6 +42,9 @@ const logCreatureName = document.querySelector("#log-creature-name");
 const creatureLog = document.querySelector("#creature-log");
 const creatureEventCount = document.querySelector("#creature-event-count");
 const clearCreatureLog = document.querySelector("#clear-creature-log");
+const worldMapGrid = document.querySelector("#world-map-grid");
+const mapChunkCount = document.querySelector("#map-chunk-count");
+const mapEntityCount = document.querySelector("#map-entity-count");
 
 const species = new Set();
 const creatures = [];
@@ -298,6 +304,12 @@ function appendCreatureLog(entry) {
     activity.setAttribute("aria-label", `Last update ${entry.time}`);
   }
 
+  const mapSignal = worldMapGrid.querySelector(`[data-entity-id="${CSS.escape(entry.creature_id)}"]`);
+  if (mapSignal) {
+    mapSignal.classList.remove("pulse");
+    requestAnimationFrame(() => mapSignal.classList.add("pulse"));
+  }
+
   if (entry.creature_id !== selectedCreatureID) return;
   creatureLog.querySelector(".console-empty")?.remove();
   creatureLog.append(createConsoleLine(entry));
@@ -338,8 +350,79 @@ function updateCreatureStatusDisplay(status, creatureID) {
   selectedThirstRate.textContent = Number(status.thirst_rate).toFixed(4);
 }
 
+function setRuntimeView(view) {
+  for (const button of runtimeViewButtons) {
+    const isActive = button.dataset.runtimeView === view;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  }
+}
+
+function clampPercentage(value) {
+  return Math.min(98, Math.max(2, value));
+}
+
+function renderWorldMap(snapshot) {
+  worldMapGrid.replaceChildren();
+  worldMapGrid.style.setProperty("--map-columns", String(snapshot.columns));
+  worldMapGrid.style.setProperty("--map-rows", String(snapshot.rows));
+  mapChunkCount.textContent = String(snapshot.chunks.length).padStart(2, "0");
+  mapEntityCount.textContent = String(snapshot.creature_count).padStart(2, "0");
+
+  for (const chunk of snapshot.chunks) {
+    const chunkElement = document.createElement("article");
+    chunkElement.className = "map-chunk";
+    chunkElement.style.gridColumn = String(chunk.grid_x + 1);
+    chunkElement.style.gridRow = String(chunk.grid_y + 1);
+    chunkElement.style.aspectRatio = `${chunk.width} / ${chunk.height}`;
+
+    const label = document.createElement("span");
+    label.className = "map-chunk-label";
+    label.textContent = `CHUNK ${String(chunk.grid_x).padStart(2, "0")}:${String(chunk.grid_y).padStart(2, "0")}`;
+    chunkElement.append(label);
+
+    const count = document.createElement("span");
+    count.className = "map-chunk-count";
+    count.textContent = `${chunk.entities.length} ENT`;
+    chunkElement.append(count);
+
+    for (const entity of chunk.entities) {
+      const signal = document.createElement("button");
+      signal.className = "map-entity-signal";
+      signal.type = "button";
+      signal.dataset.entityId = entity.id;
+      signal.style.left = `${clampPercentage((entity.x / chunk.width) * 100)}%`;
+      signal.style.top = `${clampPercentage((entity.y / chunk.height) * 100)}%`;
+      signal.title = `${entity.name} · ${entity.species} · (${entity.x.toFixed(1)}, ${entity.y.toFixed(1)})`;
+      signal.setAttribute("aria-label", signal.title);
+      signal.addEventListener("click", () => enterWorld(entity.id));
+
+      const core = document.createElement("span");
+      core.textContent = glyphFor(entity);
+      signal.append(core);
+      chunkElement.append(signal);
+    }
+
+    worldMapGrid.append(chunkElement);
+  }
+}
+
+async function loadWorldMap() {
+  try {
+    const response = await fetch("/api/world/map");
+    if (!response.ok) throw new Error((await response.text()).trim() || "The map could not be loaded");
+    renderWorldMap(await response.json());
+  } catch (error) {
+    worldMapGrid.replaceChildren();
+    const message = document.createElement("p");
+    message.className = "map-error";
+    message.textContent = error.message;
+    worldMapGrid.append(message);
+  }
+}
+
 function openCreatureStream() {
-  if (creatureStream) creatureStream.close();
+  if (creatureStream && creatureStream.readyState !== EventSource.CLOSED) return;
   creatureStream = new EventSource("/api/world/logs");
   creatureStream.addEventListener("creature-log", ({ data }) => {
     appendCreatureLog(JSON.parse(data));
@@ -350,16 +433,46 @@ function openCreatureStream() {
   };
 }
 
-function enterWorld() {
-  renderRuntimeRoster();
+function enterWorld(targetCreatureID = selectedCreatureID, updateHistory = true) {
+  if (!runtimeCreatureList.childElementCount) renderRuntimeRoster();
   bootScreen.hidden = true;
+  runtimeTabs.hidden = false;
+  mapScreen.hidden = true;
   worldScreen.hidden = false;
-  if (creatures.length > 0) selectCreature(creatures[0].id);
+  setRuntimeView("creatures");
+  const creatureID = targetCreatureID || creatures[0]?.id;
+  if (creatureID) selectCreature(creatureID);
   document.title = "World online · Simulator";
-  if (window.location.pathname !== "/world") history.pushState({ view: "world" }, "", "/world");
+  if (updateHistory && window.location.pathname !== "/world") history.pushState({ view: "world" }, "", "/world");
   openCreatureStream();
   window.scrollTo({ top: 0, behavior: "instant" });
 }
+
+function enterMap(updateHistory = true) {
+  bootScreen.hidden = true;
+  runtimeTabs.hidden = false;
+  worldScreen.hidden = true;
+  mapScreen.hidden = false;
+  setRuntimeView("map");
+  document.title = "World map · Simulator";
+  if (updateHistory && window.location.pathname !== "/map") history.pushState({ view: "map" }, "", "/map");
+  openCreatureStream();
+  loadWorldMap();
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
+for (const button of runtimeViewButtons) {
+  button.addEventListener("click", () => {
+    if (button.dataset.runtimeView === "map") enterMap();
+    else enterWorld();
+  });
+}
+
+window.addEventListener("popstate", () => {
+  if (runtimeTabs.hidden) return;
+  if (window.location.pathname === "/map") enterMap(false);
+  else enterWorld(selectedCreatureID, false);
+});
 
 startWorld.addEventListener("click", async () => {
   startWorld.disabled = true;
@@ -418,7 +531,8 @@ stream.addEventListener("complete", ({ data }) => {
   startWorld.disabled = false;
   document.title = "World ready · Simulator";
 
-  if (event.running && window.location.pathname === "/world") enterWorld();
+  if (event.running && window.location.pathname === "/map") enterMap(false);
+  else if (event.running && window.location.pathname === "/world") enterWorld("", false);
 });
 
 stream.addEventListener("world-error", ({ data }) => {

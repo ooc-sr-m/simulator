@@ -1,6 +1,9 @@
 package worldmap
 
+import "github.com/google/uuid"
+
 type Chunk struct {
+	ID          uuid.UUID
 	GridX       int
 	GridY       int
 	Width       float64

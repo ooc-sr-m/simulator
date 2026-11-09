@@ -165,6 +165,7 @@ func (service *WorldService) CreateWorldWithConfig(config WorldGenerationConfig)
 	for gridY := 0; gridY < config.Rows; gridY++ {
 		for gridX := 0; gridX < config.Columns; gridX++ {
 			chunks = append(chunks, worldmap.Chunk{
+				ID:          uuid.New(),
 				GridX:       gridX,
 				GridY:       gridY,
 				Width:       config.ChunkWidth,
@@ -194,6 +195,14 @@ func (service *WorldService) CreateCreaturesWithObserver(observer CreatureInitia
 	if service == nil || service.nameRandom == nil {
 		return nil, fmt.Errorf("world service is not initialized")
 	}
+	service.mutex.Lock()
+	worldInitialized := service.world != nil
+	service.mutex.Unlock()
+	if !worldInitialized {
+		if _, err := service.CreateWorld(); err != nil {
+			return nil, fmt.Errorf("create world before creatures: %w", err)
+		}
+	}
 
 	dogs := make([]*dog.Dog, 0, defaultCreatureCount)
 
@@ -206,6 +215,9 @@ func (service *WorldService) CreateCreaturesWithObserver(observer CreatureInitia
 		dogInstance, err := service.CreateDog(name, "Mixed")
 		if err != nil {
 			return nil, fmt.Errorf("create dog: %w", err)
+		}
+		if err := service.placeCreatureInWorld(&dogInstance.Creature); err != nil {
+			return nil, fmt.Errorf("place dog in world: %w", err)
 		}
 
 		if observer != nil {
@@ -243,6 +255,28 @@ func (service *WorldService) CreateCreaturesWithObserver(observer CreatureInitia
 	service.mutex.Unlock()
 
 	return dogs, nil
+}
+
+func (service *WorldService) placeCreatureInWorld(creature *creatures.Creature) error {
+	if creature == nil {
+		return fmt.Errorf("creature is not initialized")
+	}
+
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+	if service.world == nil || len(service.world.Chunks) == 0 {
+		return fmt.Errorf("world contains no chunks")
+	}
+
+	chunkIndex := service.nameRandom.Intn(len(service.world.Chunks))
+	chunk := &service.world.Chunks[chunkIndex]
+	creature.Location = chunk.ID
+	creature.Position = worldmap.Position{
+		X: service.nameRandom.Float64() * chunk.Width,
+		Y: service.nameRandom.Float64() * chunk.Height,
+	}
+	chunk.EntityIDs = append(chunk.EntityIDs, creature.ID.String())
+	return nil
 }
 
 // GetCreatureStatus devuelve el estado actual de una criatura específica
