@@ -44,6 +44,8 @@ const species = new Set();
 const creatures = [];
 const creaturesByID = new Map();
 const logsByCreature = new Map();
+const statusByCreature = new Map();
+const maxLogsPerCreature = 100;
 let receivedEvents = 0;
 let displayedProgress = 0;
 let progressAnimation;
@@ -240,19 +242,16 @@ function selectCreature(creatureID) {
   selectedAge.textContent = String(creature.age);
   logCreatureName.textContent = creature.name || "Unnamed creature";
 
-  // Actualizar los valores iniciales de hambre/sed desde la data de inicialización
-  // Usar los valores reales del genome, no hardcoded
-  selectedHunger.textContent = String(Math.floor(creature.hunger_max / 2));
-  selectedMaxHunger.textContent = String(creature.hunger_max);
-  
-  // Thirst values - usar default ya que no están en la data de inicialización
-  selectedThirst.textContent = "50";
-  selectedMaxThirst.textContent = "100";
-  
-  // Mostrar las tasas fijas de hambre/sed
-  selectedHungerRate.textContent = Number(creature.hunger_rate).toFixed(4);
-  selectedThirstRate.textContent = "0.5000"; // Valor por defecto
-  
+  const currentStatus = statusByCreature.get(creatureID) ?? {
+    hunger: creature.hunger,
+    max_hunger: creature.hunger_max,
+    hunger_rate: creature.hunger_rate,
+    thirst: creature.thirst,
+    max_thirst: creature.thirst_max,
+    thirst_rate: creature.thirst_rate,
+  };
+  updateCreatureStatusDisplay(currentStatus, creatureID);
+
   selectedCapabilities.replaceChildren(...creature.capabilities.map(createCapabilityChip));
   renderSelectedCreatureLogs();
   startStatusUpdates(creatureID);
@@ -285,7 +284,9 @@ function renderSelectedCreatureLogs() {
 function appendCreatureLog(entry) {
   const logs = logsByCreature.get(entry.creature_id) ?? [];
   logs.push(entry);
-  if (logs.length > 250) logs.splice(0, logs.length - 250);
+  if (logs.length > maxLogsPerCreature) {
+    logs.splice(0, logs.length - maxLogsPerCreature);
+  }
   logsByCreature.set(entry.creature_id, logs);
 
   const item = runtimeCreatureList.querySelector(`[data-entity-id="${CSS.escape(entry.creature_id)}"]`);
@@ -300,34 +301,41 @@ function appendCreatureLog(entry) {
   if (entry.creature_id !== selectedCreatureID) return;
   creatureLog.querySelector(".console-empty")?.remove();
   creatureLog.append(createConsoleLine(entry));
+  const renderedLines = creatureLog.querySelectorAll(".console-line");
+  if (renderedLines.length > maxLogsPerCreature) renderedLines[0].remove();
   creatureEventCount.textContent = `${formatCounter(logs.length)} EVENTS`;
   creatureLog.scrollTop = creatureLog.scrollHeight;
 }
 
 function startStatusUpdates(creatureID) {
   if (statusInterval) clearInterval(statusInterval);
-  
-  statusInterval = setInterval(async () => {
-    try {
-      const response = await fetch(`/api/world/status/${creatureID}`);
-      if (response.ok) {
-        const status = await response.json();
-        updateCreatureStatusDisplay(status);
-      }
-    } catch (err) {
-      console.error("Failed to fetch creature status:", err);
-    }
-  }, 1000);
+
+  refreshCreatureStatus(creatureID);
+  statusInterval = setInterval(() => refreshCreatureStatus(creatureID), 1000);
 }
 
-function updateCreatureStatusDisplay(status) {
-  if (!status || !selectedCreatureID) return;
+async function refreshCreatureStatus(creatureID) {
+  try {
+    const response = await fetch(`/api/world/status/${encodeURIComponent(creatureID)}`);
+    if (!response.ok || creatureID !== selectedCreatureID) return;
+    const status = await response.json();
+    updateCreatureStatusDisplay(status, creatureID);
+  } catch (error) {
+    console.error("Failed to fetch creature status:", error);
+  }
+}
 
-  // Actualizar los valores de hambre y sed en tiempo real
+function updateCreatureStatusDisplay(status, creatureID) {
+  if (!status) return;
+  statusByCreature.set(creatureID, status);
+  if (creatureID !== selectedCreatureID) return;
+
   selectedHunger.textContent = String(status.hunger);
   selectedMaxHunger.textContent = String(status.max_hunger);
   selectedThirst.textContent = String(status.thirst);
   selectedMaxThirst.textContent = String(status.max_thirst);
+  selectedHungerRate.textContent = Number(status.hunger_rate).toFixed(4);
+  selectedThirstRate.textContent = Number(status.thirst_rate).toFixed(4);
 }
 
 function openCreatureStream() {

@@ -8,15 +8,14 @@ import (
 
 	"simulator/helper"
 	"simulator/models/creatures/dog"
-	"simulator/services"
 )
 
 // DogService owns the business logic and state updates for one dog.
 // A different instance must be created for every dog in the world.
 type DogService struct {
-	dog            *dog.Dog
-	logger         helper.GroupLogger
-	metabolismSvc  *services.MetabolismService
+	dog           *dog.Dog
+	logger        helper.GroupLogger
+	metabolismSvc *MetabolismService
 }
 
 const dogUpdateInterval = time.Second
@@ -32,7 +31,7 @@ func NewDogService(createdDog *dog.Dog, logger helper.GroupLogger) (*DogService,
 		return nil, fmt.Errorf("dog logger is not initialized")
 	}
 
-	metabolismSvc, err := services.NewMetabolismService(createdDog.Creature.Genome)
+	metabolismSvc, err := NewMetabolismService(createdDog.Creature.Genome)
 	if err != nil {
 		return nil, fmt.Errorf("create metabolism service: %w", err)
 	}
@@ -60,7 +59,7 @@ func (service *DogService) Update() error {
 	name := strings.TrimSpace(*service.dog.Name)
 	hunger, thirst := service.metabolismSvc.GetCurrentState()
 	group := fmt.Sprintf("perro %s · %s", name, service.dog.Creature.ID)
-	message := fmt.Sprintf("hola mundo, soy el perro %s | hambre: %d/%d | sed: %d/%d", 
+	message := fmt.Sprintf("hola mundo, soy el perro %s | hambre: %d/%d | sed: %d/%d",
 		name, hunger, service.metabolismSvc.GetMaxHunger(), thirst, service.metabolismSvc.GetMaxThirst())
 
 	if err := service.logger.Log(group, message); err != nil {
@@ -68,6 +67,19 @@ func (service *DogService) Update() error {
 	}
 
 	return nil
+}
+
+// GetMetabolismState returns the current state used by the simulation loop.
+func (service *DogService) GetMetabolismState() (hunger, hungerMax int, hungerRate float64, thirst, thirstMax int, thirstRate float64, err error) {
+	if service == nil || service.metabolismSvc == nil {
+		return 0, 0, 0, 0, 0, 0, fmt.Errorf("dog metabolism service is not initialized")
+	}
+
+	hunger, thirst = service.metabolismSvc.GetCurrentState()
+	hungerMax = service.metabolismSvc.GetMaxHunger()
+	thirstMax = service.metabolismSvc.GetMaxThirst()
+	hungerRate, thirstRate = service.metabolismSvc.GetRates()
+	return hunger, hungerMax, hungerRate, thirst, thirstMax, thirstRate, nil
 }
 
 // Run keeps this dog alive until the simulation is stopped. The first update

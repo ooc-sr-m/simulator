@@ -18,8 +18,19 @@ import (
 // WorldService gestiona el mundo de simulación y la creación de criaturas
 type WorldService struct {
 	nameRandom *rand.Rand
+	world      *worldmap.GlobalScene
 	dogs       []*dog.Dog
 	mutex      sync.Mutex
+}
+
+// WorldGenerationConfig define la cuadrícula y la escala de los chunks.
+type WorldGenerationConfig struct {
+	Columns          int
+	Rows             int
+	ChunkWidth       float64
+	ChunkHeight      float64
+	ChunkPixelWidth  int
+	ChunkPixelHeight int
 }
 
 // CreatureInitializationEvent representa un evento de inicialización de criatura
@@ -31,26 +42,41 @@ type CreatureInitializationEvent struct {
 	Variant      string   `json:"variant,omitempty"`
 	ID           string   `json:"id"`
 	Age          int      `json:"age"`
+	Hunger       int      `json:"hunger"`
 	HungerMax    int      `json:"hunger_max"`
 	HungerRate   float64  `json:"hunger_rate"`
+	Thirst       int      `json:"thirst"`
+	ThirstMax    int      `json:"thirst_max"`
+	ThirstRate   float64  `json:"thirst_rate"`
 	Capabilities []string `json:"capabilities"`
 }
 
 // CreatureStatus representa el estado actual de una criatura
 type CreatureStatus struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Species   string `json:"species"`
-	Hunger    int    `json:"hunger"`
-	MaxHunger int    `json:"max_hunger"`
-	Thirst    int    `json:"thirst"`
-	MaxThirst int    `json:"max_thirst"`
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Species    string  `json:"species"`
+	Hunger     int     `json:"hunger"`
+	MaxHunger  int     `json:"max_hunger"`
+	HungerRate float64 `json:"hunger_rate"`
+	Thirst     int     `json:"thirst"`
+	MaxThirst  int     `json:"max_thirst"`
+	ThirstRate float64 `json:"thirst_rate"`
 }
 
 // CreatureInitializationObserver es un callback para eventos de inicialización de criaturas
 type CreatureInitializationObserver func(CreatureInitializationEvent)
 
 const defaultCreatureCount = 10
+
+var defaultWorldGenerationConfig = WorldGenerationConfig{
+	Columns:          1,
+	Rows:             1,
+	ChunkWidth:       100,
+	ChunkHeight:      100,
+	ChunkPixelWidth:  100,
+	ChunkPixelHeight: 100,
+}
 
 // NewWorldService crea un nuevo servicio de mundo con la semilla especificada
 func NewWorldService(seed int64) *WorldService {
@@ -88,8 +114,8 @@ func (service *WorldService) CreateDog(name string, breed string) (*dog.Dog, err
 
 	createdDog := &dog.Dog{
 		Creature: creatures.Creature{
-			ID:           uuid.New(),
-			Species:      profile.ID,
+			ID:      uuid.New(),
+			Species: profile.ID,
 			Genome: &creatures.Genome{
 				SpeciesID:  profile.ID,
 				Labels:     capabilities,
@@ -112,6 +138,50 @@ func (service *WorldService) CreateDog(name string, breed string) (*dog.Dog, err
 	}
 
 	return createdDog, nil
+}
+
+// CreateWorld genera un mundo mínimo usando la configuración predeterminada.
+func (service *WorldService) CreateWorld() (*worldmap.GlobalScene, error) {
+	return service.CreateWorldWithConfig(defaultWorldGenerationConfig)
+}
+
+// CreateWorldWithConfig genera todos los chunks en orden de filas y almacena
+// la escena resultante como el mundo activo del servicio.
+func (service *WorldService) CreateWorldWithConfig(config WorldGenerationConfig) (*worldmap.GlobalScene, error) {
+	if service == nil || service.nameRandom == nil {
+		return nil, fmt.Errorf("world service is not initialized")
+	}
+	if config.Columns <= 0 || config.Rows <= 0 {
+		return nil, fmt.Errorf("world grid must contain at least one row and one column")
+	}
+	if config.ChunkWidth <= 0 || config.ChunkHeight <= 0 {
+		return nil, fmt.Errorf("chunk dimensions must be greater than zero")
+	}
+	if config.ChunkPixelWidth <= 0 || config.ChunkPixelHeight <= 0 {
+		return nil, fmt.Errorf("chunk pixel dimensions must be greater than zero")
+	}
+
+	chunks := make([]worldmap.Chunk, 0, config.Columns*config.Rows)
+	for gridY := 0; gridY < config.Rows; gridY++ {
+		for gridX := 0; gridX < config.Columns; gridX++ {
+			chunks = append(chunks, worldmap.Chunk{
+				GridX:       gridX,
+				GridY:       gridY,
+				Width:       config.ChunkWidth,
+				Height:      config.ChunkHeight,
+				PixelWidth:  config.ChunkPixelWidth,
+				PixelHeight: config.ChunkPixelHeight,
+				EntityIDs:   make([]string, 0),
+			})
+		}
+	}
+
+	world := &worldmap.GlobalScene{Chunks: chunks}
+	service.mutex.Lock()
+	service.world = world
+	service.mutex.Unlock()
+
+	return world, nil
 }
 
 // CreateCreatures crea un conjunto de criaturas predeterminadas en el mundo
@@ -155,8 +225,12 @@ func (service *WorldService) CreateCreaturesWithObserver(observer CreatureInitia
 				Variant:      dogInstance.Breed,
 				ID:           dogInstance.Creature.ID.String(),
 				Age:          dogInstance.Creature.Age,
+				Hunger:       dogInstance.Creature.Genome.HungerMax / 2,
 				HungerMax:    dogInstance.Creature.Genome.HungerMax,
 				HungerRate:   dogInstance.Creature.Genome.HungerRate,
+				Thirst:       dogInstance.Creature.Genome.ThirstMax / 2,
+				ThirstMax:    dogInstance.Creature.Genome.ThirstMax,
+				ThirstRate:   dogInstance.Creature.Genome.ThirstRate,
 				Capabilities: capabilities,
 			})
 		}
@@ -179,13 +253,15 @@ func (service *WorldService) GetCreatureStatus(creatureID string) (*CreatureStat
 	for _, dog := range service.dogs {
 		if dog.Creature.ID.String() == creatureID {
 			return &CreatureStatus{
-				ID:        dog.Creature.ID.String(),
-				Name:      *dog.Name,
-				Species:   dog.Creature.Species,
-				Hunger:    0, // Se llenará con el servicio de metabolismo
-				MaxHunger: dog.Creature.Genome.HungerMax,
-				Thirst:    0, // Se llenará con el servicio de metabolismo
-				MaxThirst: dog.Creature.Genome.ThirstMax,
+				ID:         dog.Creature.ID.String(),
+				Name:       *dog.Name,
+				Species:    dog.Creature.Species,
+				Hunger:     dog.Creature.Genome.HungerMax / 2,
+				MaxHunger:  dog.Creature.Genome.HungerMax,
+				HungerRate: dog.Creature.Genome.HungerRate,
+				Thirst:     dog.Creature.Genome.ThirstMax / 2,
+				MaxThirst:  dog.Creature.Genome.ThirstMax,
+				ThirstRate: dog.Creature.Genome.ThirstRate,
 			}, nil
 		}
 	}
@@ -201,13 +277,15 @@ func (service *WorldService) GetAllCreatureStatus() ([]*CreatureStatus, error) {
 	statuses := make([]*CreatureStatus, 0, len(service.dogs))
 	for _, dog := range service.dogs {
 		statuses = append(statuses, &CreatureStatus{
-			ID:        dog.Creature.ID.String(),
-			Name:      *dog.Name,
-			Species:   dog.Creature.Species,
-			Hunger:    0, // Se llenará con el servicio de metabolismo
-			MaxHunger: dog.Creature.Genome.HungerMax,
-			Thirst:    0, // Se llenará con el servicio de metabolismo
-			MaxThirst: dog.Creature.Genome.ThirstMax,
+			ID:         dog.Creature.ID.String(),
+			Name:       *dog.Name,
+			Species:    dog.Creature.Species,
+			Hunger:     dog.Creature.Genome.HungerMax / 2,
+			MaxHunger:  dog.Creature.Genome.HungerMax,
+			HungerRate: dog.Creature.Genome.HungerRate,
+			Thirst:     dog.Creature.Genome.ThirstMax / 2,
+			MaxThirst:  dog.Creature.Genome.ThirstMax,
+			ThirstRate: dog.Creature.Genome.ThirstRate,
 		})
 	}
 

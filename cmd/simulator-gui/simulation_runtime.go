@@ -6,19 +6,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
-	creatureservices "simulator/services/creatures"
 	"simulator/models/creatures/dog"
 	"simulator/services"
+	creatureservices "simulator/services/creatures"
 )
 
 const (
 	logSubscriberBuffer = 512
-	maxLogHistory       = 2500
+	maxLogsPerCreature  = 100
 )
 
 type creatureLogEvent struct {
@@ -28,35 +26,23 @@ type creatureLogEvent struct {
 	CreatureName string `json:"creature_name"`
 	Scope        string `json:"scope"`
 	Message      string `json:"message"`
-	Hunger       int    `json:"hunger,omitempty"`
-	Thirst       int    `json:"thirst,omitempty"`
 }
 
 type simulationRuntime struct {
 	mutex       sync.Mutex
 	dogs        []*dog.Dog
+	dogServices map[string]*creatureservices.DogService
 	creatures   []services.CreatureInitializationEvent
 	running     bool
-	history     []creatureLogEvent
+	history     map[string][]creatureLogEvent
 	subscribers map[chan creatureLogEvent]struct{}
-	worldService *services.WorldService
-	// Map para rastrear el estado metabólico actual por criatura
-	metabolismState map[string]*metabolismStatus
-}
-
-type metabolismStatus struct {
-	Hunger      int
-	MaxHunger   int
-	Thirst      int
-	MaxThirst   int
-	HungerRate  float64
-	ThirstRate  float64
 }
 
 func newSimulationRuntime() *simulationRuntime {
 	return &simulationRuntime{
-		subscribers:     make(map[chan creatureLogEvent]struct{}),
-		metabolismState: make(map[string]*metabolismStatus),
+		dogServices: make(map[string]*creatureservices.DogService),
+		history:     make(map[string][]creatureLogEvent),
+		subscribers: make(map[chan creatureLogEvent]struct{}),
 	}
 }
 
@@ -66,34 +52,6 @@ func (runtime *simulationRuntime) setWorld(dogs []*dog.Dog, creatures []services
 
 	runtime.dogs = append([]*dog.Dog(nil), dogs...)
 	runtime.creatures = append([]services.CreatureInitializationEvent(nil), creatures...)
-	
-	// Inicializar el estado metabólico para cada criatura con valores reales del genome
-	for i, dog := range dogs {
-		if dog.Name != nil && *dog.Name != "" {
-			creatureID := dog.Creature.ID.String()
-			
-			// Obtener los datos de inicialización correspondientes
-			var initEvent services.CreatureInitializationEvent
-			if i < len(creatures) {
-				initEvent = creatures[i]
-			} else {
-				// Fallback si no hay evento de inicialización
-				initEvent = services.CreatureInitializationEvent{
-					HungerMax: 100,
-					HungerRate: 0.5,
-				}
-			}
-
-			runtime.metabolismState[creatureID] = &metabolismStatus{
-				Hunger:     initEvent.HungerMax / 2, // Valor inicial típico
-				MaxHunger:  initEvent.HungerMax,
-				Thirst:     50, // Valor por defecto
-				MaxThirst:  100, // Valor por defecto (se puede ajustar según genome)
-				HungerRate: initEvent.HungerRate,
-				ThirstRate: 0.5, // Valor por defecto
-			}
-		}
-	}
 }
 
 func (runtime *simulationRuntime) worldSnapshot() ([]services.CreatureInitializationEvent, bool) {
@@ -115,44 +73,46 @@ func (runtime *simulationRuntime) start() (bool, error) {
 	}
 
 	dogs := append([]*dog.Dog(nil), runtime.dogs...)
+	dogServices := make(map[string]*creatureservices.DogService, len(dogs))
+	for _, createdDog := range dogs {
+		name := "Unnamed dog"
+		if createdDog.Name != nil {
+			name = *createdDog.Name
+		}
+		logger := creatureEventLogger{
+			runtime:      runtime,
+			creatureID:   createdDog.Creature.ID.String(),
+			creatureName: name,
+		}
+		dogService, err := creatureservices.NewDogService(createdDog, logger)
+		if err != nil {
+			runtime.mutex.Unlock()
+			return false, fmt.Errorf("create dog service: %w", err)
+		}
+		dogServices[createdDog.Creature.ID.String()] = dogService
+	}
+	runtime.dogServices = dogServices
 	runtime.running = true
 	runtime.mutex.Unlock()
 
 	for _, createdDog := range dogs {
-		go func(dog *dog.Dog) {
-			logger := creatureEventLogger{
-				runtime:      runtime,
-				creatureID:   dog.Creature.ID.String(),
-				creatureName: "Unnamed dog",
-			}
-			if dog.Name != nil {
-				logger.creatureName = *dog.Name
-			}
-
-			dogService, err := creatureservices.NewDogService(dog, logger)
-			if err != nil {
+		dogService := dogServices[createdDog.Creature.ID.String()]
+		go func(currentDog *dog.Dog, service *creatureservices.DogService) {
+			if err := service.Run(context.Background()); err != nil {
+				name := "Unnamed dog"
+				if currentDog.Name != nil {
+					name = *currentDog.Name
+				}
 				runtime.publish(creatureLogEvent{
 					Time:         time.Now().Format("15:04:05.000"),
 					Level:        "ERROR",
-					CreatureID:   dog.Creature.ID.String(),
-					CreatureName: logger.creatureName,
-					Scope:        "DOG SERVICE",
-					Message:      fmt.Sprintf("create service: %v", err),
-				})
-				return
-			}
-
-			if err := dogService.Run(context.Background()); err != nil {
-				runtime.publish(creatureLogEvent{
-					Time:         time.Now().Format("15:04:05.000"),
-					Level:        "ERROR",
-					CreatureID:   dog.Creature.ID.String(),
-					CreatureName: logger.creatureName,
+					CreatureID:   currentDog.Creature.ID.String(),
+					CreatureName: name,
 					Scope:        "DOG SERVICE",
 					Message:      err.Error(),
 				})
 			}
-		}(createdDog)
+		}(createdDog, dogService)
 	}
 
 	return true, nil
@@ -162,10 +122,11 @@ func (runtime *simulationRuntime) publish(event creatureLogEvent) {
 	runtime.mutex.Lock()
 	defer runtime.mutex.Unlock()
 
-	runtime.history = append(runtime.history, event)
-	if len(runtime.history) > maxLogHistory {
-		runtime.history = append([]creatureLogEvent(nil), runtime.history[len(runtime.history)-maxLogHistory:]...)
+	creatureHistory := append(runtime.history[event.CreatureID], event)
+	if len(creatureHistory) > maxLogsPerCreature {
+		creatureHistory = creatureHistory[len(creatureHistory)-maxLogsPerCreature:]
 	}
+	runtime.history[event.CreatureID] = creatureHistory
 
 	for subscriber := range runtime.subscribers {
 		select {
@@ -181,7 +142,10 @@ func (runtime *simulationRuntime) subscribe() (<-chan creatureLogEvent, []creatu
 
 	updates := make(chan creatureLogEvent, logSubscriberBuffer)
 	runtime.subscribers[updates] = struct{}{}
-	history := append([]creatureLogEvent(nil), runtime.history...)
+	history := make([]creatureLogEvent, 0, len(runtime.history)*maxLogsPerCreature)
+	for _, creatureHistory := range runtime.history {
+		history = append(history, creatureHistory...)
+	}
 
 	unsubscribe := func() {
 		runtime.mutex.Lock()
@@ -237,52 +201,49 @@ func (runtime *simulationRuntime) logsHandler(response http.ResponseWriter, requ
 
 func (runtime *simulationRuntime) getCreatureStatus(creatureID string) (*services.CreatureStatus, error) {
 	runtime.mutex.Lock()
-	defer runtime.mutex.Unlock()
+	var selectedDog *dog.Dog
+	for _, currentDog := range runtime.dogs {
+		if currentDog.Creature.ID.String() == creatureID {
+			selectedDog = currentDog
+			break
+		}
+	}
+	dogService := runtime.dogServices[creatureID]
+	runtime.mutex.Unlock()
 
-	for _, dog := range runtime.dogs {
-		if dog.Creature.ID.String() == creatureID {
-			// Obtener el estado metabólico actual para esta criatura
-			state, exists := runtime.metabolismState[creatureID]
-			if !exists {
-				// Si no existe, crear uno con valores por defecto
-				state = &metabolismStatus{
-					Hunger:     50,
-					MaxHunger:  100,
-					Thirst:     50,
-					MaxThirst:  100,
-					HungerRate: 0.5,
-					ThirstRate: 0.5,
-				}
-				runtime.metabolismState[creatureID] = state
-			}
+	if selectedDog == nil {
+		return nil, fmt.Errorf("creature not found")
+	}
 
-			return &services.CreatureStatus{
-				ID:        dog.Creature.ID.String(),
-				Name:      *dog.Name,
-				Species:   dog.Creature.Species,
-				Hunger:    state.Hunger,
-				MaxHunger: state.MaxHunger,
-				Thirst:    state.Thirst,
-				MaxThirst: state.MaxThirst,
-			}, nil
+	hunger := selectedDog.Creature.Genome.HungerMax / 2
+	hungerMax := selectedDog.Creature.Genome.HungerMax
+	hungerRate := selectedDog.Creature.Genome.HungerRate
+	thirst := selectedDog.Creature.Genome.ThirstMax / 2
+	thirstMax := selectedDog.Creature.Genome.ThirstMax
+	thirstRate := selectedDog.Creature.Genome.ThirstRate
+	if dogService != nil {
+		var err error
+		hunger, hungerMax, hungerRate, thirst, thirstMax, thirstRate, err = dogService.GetMetabolismState()
+		if err != nil {
+			return nil, fmt.Errorf("get dog metabolism: %w", err)
 		}
 	}
 
-	return nil, fmt.Errorf("creature not found")
-}
-
-// UpdateCreatureMetabolism actualiza el estado metabólico de una criatura
-func (runtime *simulationRuntime) UpdateCreatureMetabolism(creatureID string, hunger, thirst int) {
-	runtime.mutex.Lock()
-	defer runtime.mutex.Unlock()
-
-	state, exists := runtime.metabolismState[creatureID]
-	if !exists {
-		return
+	name := "Unnamed dog"
+	if selectedDog.Name != nil {
+		name = *selectedDog.Name
 	}
-
-	state.Hunger = hunger
-	state.Thirst = thirst
+	return &services.CreatureStatus{
+		ID:         selectedDog.Creature.ID.String(),
+		Name:       name,
+		Species:    selectedDog.Creature.Species,
+		Hunger:     hunger,
+		MaxHunger:  hungerMax,
+		HungerRate: hungerRate,
+		Thirst:     thirst,
+		MaxThirst:  thirstMax,
+		ThirstRate: thirstRate,
+	}, nil
 }
 
 type creatureEventLogger struct {
@@ -297,57 +258,6 @@ func (logger creatureEventLogger) Log(group string, messages ...string) error {
 	}
 
 	for _, message := range messages {
-		hunger, thirst := 0, 0
-		
-		// Parse hunger and thirst from the message format: "hambre: X/Y | sed: A/B"
-		if idx := strings.Index(message, "hambre:"); idx >= 0 {
-			parts := strings.Split(message[idx:], "|")
-			for _, part := range parts {
-				part = strings.TrimSpace(part)
-				if strings.HasPrefix(part, "hambre:") {
-					// Extraer valores de hambre: X/Y donde X es hunger actual y Y es max_hunger
-					hungerData := strings.TrimPrefix(part, "hambre:")
-					parts2 := strings.Split(hungerData, "/")
-					if len(parts2) >= 1 {
-						val, err := strconv.Atoi(strings.TrimSpace(parts2[0]))
-						if err == nil {
-							hunger = val
-						}
-					}
-					if len(parts2) >= 2 {
-						val, err := strconv.Atoi(strings.TrimSpace(parts2[1]))
-						if err == nil {
-							// Actualizar max_hunger si lo vemos en el log
-							state, exists := logger.runtime.metabolismState[logger.creatureID]
-							if exists {
-								state.MaxHunger = val
-							}
-						}
-					}
-				} else if strings.HasPrefix(part, "sed:") {
-					// Extraer valores de sed: X/Y donde X es thirst actual y Y es max_thirst
-					thirstData := strings.TrimPrefix(part, "sed:")
-					parts2 := strings.Split(thirstData, "/")
-					if len(parts2) >= 1 {
-						val, err := strconv.Atoi(strings.TrimSpace(parts2[0]))
-						if err == nil {
-							thirst = val
-						}
-					}
-					if len(parts2) >= 2 {
-						val, err := strconv.Atoi(strings.TrimSpace(parts2[1]))
-						if err == nil {
-							// Actualizar max_thirst si lo vemos en el log
-							state, exists := logger.runtime.metabolismState[logger.creatureID]
-							if exists {
-								state.MaxThirst = val
-							}
-						}
-					}
-				}
-			}
-		}
-
 		logger.runtime.publish(creatureLogEvent{
 			Time:         time.Now().Format("15:04:05.000"),
 			Level:        "INFO",
@@ -355,14 +265,7 @@ func (logger creatureEventLogger) Log(group string, messages ...string) error {
 			CreatureName: logger.creatureName,
 			Scope:        group,
 			Message:      message,
-			Hunger:       hunger,
-			Thirst:       thirst,
 		})
-
-		// Actualizar el estado metabólico para esta criatura
-		if hunger > 0 || thirst > 0 {
-			logger.runtime.UpdateCreatureMetabolism(logger.creatureID, hunger, thirst)
-		}
 	}
 
 	return nil
